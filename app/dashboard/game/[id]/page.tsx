@@ -6,11 +6,17 @@ import type { GameState, GameHistoryEntry } from '../../../../types/bingo'
 
 const HISTORY_KEY = 'bingo_history'
 
+declare global {
+  interface Window {
+    Spotify: any
+    onSpotifyWebPlaybackSDKReady: () => void
+  }
+}
+
 export default function GamePage() {
   const router = useRouter()
   const params = useParams()
   const gameId = params.id as string
-  const audioRef = useRef<HTMLAudioElement>(null)
 
   const [game, setGame] = useState<GameState | null>(null)
   const [status, setStatus] = useState<'playing' | 'line-check' | 'bingo-check' | 'finished'>(
@@ -18,6 +24,7 @@ export default function GamePage() {
   )
   const [mounted, setMounted] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
+  const [player, setPlayer] = useState<any>(null)
 
   useEffect(() => {
     const raw = localStorage.getItem(`game_${gameId}`)
@@ -33,26 +40,66 @@ export default function GamePage() {
   }, [gameId, router])
 
   useEffect(() => {
-    if (!game || !audioRef.current) return
+    const token = document.cookie
+      .split('; ')
+      .find(row => row.startsWith('spotify_access_token='))
+      ?.split('=')[1]
+
+    if (!token) return
+
+    window.onSpotifyWebPlaybackSDKReady = () => {
+      const spotifyPlayer = new window.Spotify.Player({
+        name: 'Bingo Musical',
+        getOAuthToken: (callback: (token: string) => void) => callback(token),
+        volume: 0.5,
+      })
+
+      spotifyPlayer.addListener('player_state_changed', (state: any) => {
+        if (state) {
+          setIsPlaying(!state.paused)
+        }
+      })
+
+      spotifyPlayer.connect().then((success: boolean) => {
+        if (success) setPlayer(spotifyPlayer)
+      })
+    }
+
+    const script = document.createElement('script')
+    script.src = 'https://sdk.scdn.co/spotify-player.js'
+    script.async = true
+    document.body.appendChild(script)
+
+    return () => {
+      if (player) player.disconnect()
+    }
+  }, [])
+
+  useEffect(() => {
+    if (!game || !player) return
 
     const currentTrack = game.tracks.find(t => t.id === game.drawnIds.at(-1))
-    if (currentTrack?.preview_url) {
-      audioRef.current.src = currentTrack.preview_url
-      audioRef.current.play().catch(() => setIsPlaying(false))
-      setIsPlaying(true)
+    if (currentTrack) {
+      const trackUri = `spotify:track:${currentTrack.id}`
+      player.getCurrentState().then((state: any) => {
+        if (state === null) {
+          console.log('No playback device available')
+        } else {
+          fetch('https://api.spotify.com/v1/me/player/play', {
+            method: 'PUT',
+            headers: {
+              Authorization: `Bearer ${document.cookie
+                .split('; ')
+                .find(row => row.startsWith('spotify_access_token='))
+                ?.split('=')[1]}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ uris: [trackUri] }),
+          }).catch(() => console.log('Failed to play track'))
+        }
+      })
     }
-  }, [game?.drawnIds])
-
-  const togglePlayPause = () => {
-    if (!audioRef.current) return
-    if (isPlaying) {
-      audioRef.current.pause()
-      setIsPlaying(false)
-    } else {
-      audioRef.current.play().catch(() => setIsPlaying(false))
-      setIsPlaying(true)
-    }
-  }
+  }, [game?.drawnIds, player])
 
   const revealNext = () => {
     if (!game || status !== 'playing') return
@@ -103,6 +150,11 @@ export default function GamePage() {
     router.push('/dashboard')
   }
 
+  const togglePlayPause = () => {
+    if (!player) return
+    player.togglePlay()
+  }
+
   if (!mounted || !game) {
     return null
   }
@@ -128,23 +180,15 @@ export default function GamePage() {
               <p className="text-lg text-gray-600 mb-4">
                 {currentTrack.artists.map(a => a.name).join(', ')}
               </p>
-              {currentTrack.preview_url ? (
-                <div className="flex items-center gap-3">
-                  <button
-                    onClick={togglePlayPause}
-                    className="px-6 py-2 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 transition"
-                  >
-                    {isPlaying ? '⏸ PAUSAR' : '▶ REPRODUCIR'}
-                  </button>
-                  <audio
-                    ref={audioRef}
-                    onEnded={() => setIsPlaying(false)}
-                    onPlay={() => setIsPlaying(true)}
-                    onPause={() => setIsPlaying(false)}
-                  />
-                </div>
+              {player ? (
+                <button
+                  onClick={togglePlayPause}
+                  className="px-6 py-2 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 transition"
+                >
+                  {isPlaying ? '⏸ PAUSAR' : '▶ REPRODUCIR'}
+                </button>
               ) : (
-                <p className="text-sm text-gray-400">No hay vista previa disponible</p>
+                <p className="text-sm text-gray-400">Cargando reproductor de Spotify...</p>
               )}
             </div>
           ) : (
