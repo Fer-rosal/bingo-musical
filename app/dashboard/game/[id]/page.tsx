@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import type { GameState, GameHistoryEntry } from '../../../../types/bingo'
 
@@ -27,6 +27,7 @@ export default function GamePage() {
   const [player, setPlayer] = useState<any>(null)
   const [playerReady, setPlayerReady] = useState(false)
   const [deviceError, setDeviceError] = useState('')
+  const deviceIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     const raw = localStorage.getItem(`game_${gameId}`)
@@ -61,37 +62,32 @@ export default function GamePage() {
           })
 
           spotifyPlayer.addListener('player_state_changed', (state: any) => {
-            if (state) {
-              setIsPlaying(!state.paused)
+            if (state) setIsPlaying(!state.paused)
+          })
+
+          spotifyPlayer.addListener('ready', ({ device_id }: { device_id: string }) => {
+            console.log('Spotify Player ready, device_id:', device_id)
+            deviceIdRef.current = device_id
+            if (isMounted) {
+              setPlayer(spotifyPlayer)
+              setPlayerReady(true)
             }
           })
 
-          spotifyPlayer.addListener('ready', ({ device_id }: any) => {
-            console.log('Spotify Player ready with device:', device_id)
-            if (isMounted) setPlayerReady(true)
-          })
-
-          spotifyPlayer.addListener('not_ready', ({ device_id }: any) => {
-            console.log('Device not ready:', device_id)
+          spotifyPlayer.addListener('not_ready', () => {
+            deviceIdRef.current = null
             if (isMounted) setPlayerReady(false)
           })
 
           spotifyPlayer.addListener('initialization_error', ({ message }: any) => {
-            console.error('Init error:', message)
             if (isMounted) setDeviceError('Error inicializando: ' + message)
           })
 
           spotifyPlayer.addListener('authentication_error', ({ message }: any) => {
-            console.error('Auth error:', message)
-            if (isMounted) setDeviceError('Error de autenticación')
+            if (isMounted) setDeviceError('Error de autenticación: ' + message)
           })
 
-          spotifyPlayer.connect().then((success: boolean) => {
-            if (success && isMounted) {
-              setPlayer(spotifyPlayer)
-              console.log('Player connected')
-            }
-          })
+          spotifyPlayer.connect()
         }
 
         const script = document.createElement('script')
@@ -112,7 +108,7 @@ export default function GamePage() {
   }, [])
 
   useEffect(() => {
-    if (!game || !player || !playerReady) return
+    if (!game || !playerReady || !deviceIdRef.current) return
 
     const playTrack = async () => {
       const currentTrack = game.tracks.find(t => t.id === game.drawnIds.at(-1))
@@ -121,40 +117,36 @@ export default function GamePage() {
       try {
         const tokenRes = await fetch('/api/auth/token')
         if (!tokenRes.ok) return
-
         const { token } = await tokenRes.json()
-        const trackUri = `spotify:track:${currentTrack.id}`
 
-        console.log('Playing track:', trackUri)
+        const res = await fetch(
+          `https://api.spotify.com/v1/me/player/play?device_id=${deviceIdRef.current}`,
+          {
+            method: 'PUT',
+            headers: {
+              Authorization: `Bearer ${token}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ uris: [`spotify:track:${currentTrack.id}`] }),
+          }
+        )
 
-        await fetch('https://api.spotify.com/v1/me/player/play', {
-          method: 'PUT',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            uris: [trackUri],
-            device_id: await player.getCurrentState().then((state: any) => state?.device?.id),
-          }),
-        }).then(r => {
-          if (!r.ok) throw new Error(`${r.status}`)
-          console.log('Track playing')
-        })
+        if (!res.ok) {
+          const body = await res.json().catch(() => ({}))
+          console.error('Play failed:', res.status, body)
+        }
       } catch (e) {
         console.error('Failed to play track:', e)
       }
     }
 
     playTrack()
-  }, [game?.drawnIds, player, playerReady])
+  }, [game?.drawnIds, playerReady])
 
   const revealNext = () => {
     if (!game || status !== 'playing') return
-
     const nextId = game.shuffledQueue[game.drawnIds.length]
     if (!nextId) return
-
     const updated = { ...game, drawnIds: [...game.drawnIds, nextId] }
     setGame(updated)
     localStorage.setItem(`game_${gameId}`, JSON.stringify(updated))
@@ -186,7 +178,6 @@ export default function GamePage() {
 
   const confirmBingo = () => {
     if (!game) return
-
     const raw = localStorage.getItem(HISTORY_KEY)
     const history: GameHistoryEntry[] = raw ? JSON.parse(raw) : []
     const idx = history.findIndex(h => h.id === gameId)
@@ -194,7 +185,6 @@ export default function GamePage() {
       history[idx].status = 'finished'
       localStorage.setItem(HISTORY_KEY, JSON.stringify(history))
     }
-
     router.push('/dashboard')
   }
 
@@ -203,9 +193,7 @@ export default function GamePage() {
     player.togglePlay()
   }
 
-  if (!mounted || !game) {
-    return null
-  }
+  if (!mounted || !game) return null
 
   const currentTrack = game.tracks.find(t => t.id === game.drawnIds.at(-1))
   const hasMoreSongs = game.drawnIds.length < game.shuffledQueue.length
@@ -231,21 +219,13 @@ export default function GamePage() {
               {deviceError && (
                 <p className="text-sm text-red-600 mb-3">{deviceError}</p>
               )}
-              {player ? (
-                <>
-                  {!playerReady && (
-                    <p className="text-sm text-amber-600 mb-3">
-                      ⚠️ Abre Spotify en otra pestaña para activar un dispositivo
-                    </p>
-                  )}
-                  <button
-                    onClick={togglePlayPause}
-                    disabled={!playerReady}
-                    className="px-6 py-2 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isPlaying ? '⏸ PAUSAR' : '▶ REPRODUCIR'}
-                  </button>
-                </>
+              {playerReady ? (
+                <button
+                  onClick={togglePlayPause}
+                  className="px-6 py-2 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 transition"
+                >
+                  {isPlaying ? '⏸ PAUSAR' : '▶ REPRODUCIR'}
+                </button>
               ) : (
                 <p className="text-sm text-gray-400">Cargando reproductor de Spotify...</p>
               )}
@@ -266,35 +246,21 @@ export default function GamePage() {
         <div className="flex gap-4 mb-8">
           {status === 'playing' && (
             <>
-              <button
-                onClick={handleLine}
-                className="flex-1 py-3 bg-yellow-500 text-black text-lg font-bold rounded-xl hover:bg-yellow-600 transition"
-              >
+              <button onClick={handleLine} className="flex-1 py-3 bg-yellow-500 text-black text-lg font-bold rounded-xl hover:bg-yellow-600 transition">
                 LÍNEA
               </button>
-              <button
-                onClick={handleBingo}
-                className="flex-1 py-3 bg-red-500 text-white text-lg font-bold rounded-xl hover:bg-red-600 transition"
-              >
+              <button onClick={handleBingo} className="flex-1 py-3 bg-red-500 text-white text-lg font-bold rounded-xl hover:bg-red-600 transition">
                 BINGO
               </button>
             </>
           )}
-
           {status === 'line-check' && (
-            <button
-              onClick={confirmLine}
-              className="w-full py-3 bg-green-500 text-white text-lg font-bold rounded-xl hover:bg-green-600 transition"
-            >
+            <button onClick={confirmLine} className="w-full py-3 bg-green-500 text-white text-lg font-bold rounded-xl hover:bg-green-600 transition">
               CONFIRMAR Y REANUDAR
             </button>
           )}
-
           {status === 'bingo-check' && (
-            <button
-              onClick={confirmBingo}
-              className="w-full py-3 bg-green-700 text-white text-lg font-bold rounded-xl hover:bg-green-800 transition"
-            >
+            <button onClick={confirmBingo} className="w-full py-3 bg-green-700 text-white text-lg font-bold rounded-xl hover:bg-green-800 transition">
               CONFIRMAR Y FINALIZAR PARTIDA
             </button>
           )}
