@@ -19,25 +19,18 @@ export default function NewGamePage() {
   const [preMarkedCount, setPreMarkedCount] = useState(1)
   const [error, setError] = useState('')
 
-  const calculateMinSongs = (grid: 4 | 5, preMarked: number) => {
-    return grid * grid - preMarked
-  }
-
-  const minSongsRequired = calculateMinSongs(gridSize, preMarkedCount)
+  const minSongsRequired = gridSize * gridSize - preMarkedCount
 
   useEffect(() => {
     const fetchPlaylists = async () => {
       try {
         const res = await fetch('/api/playlists')
-        if (res.status === 401) {
-          router.push('/api/auth/login')
-          return
-        }
-        if (!res.ok) throw new Error('Error al obtener playlists')
+        if (res.status === 401) { router.push('/api/auth/login'); return }
+        if (!res.ok) throw new Error()
         const { playlists } = await res.json()
         setPlaylists(playlists)
         setStep('pick-playlist')
-      } catch (e) {
+      } catch {
         setError('No se pudo obtener tus playlists')
         setStep('pick-playlist')
       }
@@ -53,28 +46,22 @@ export default function NewGamePage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!selectedPlaylist) return
-
     setStep('generating')
     setError('')
 
     try {
       const res = await fetch(`/api/playlists/${selectedPlaylist.id}/tracks`)
-      if (res.status === 401) {
-        router.push('/api/auth/login')
-        return
-      }
+      if (res.status === 401) { router.push('/api/auth/login'); return }
       if (!res.ok) {
         const { error } = await res.json()
         throw new Error(error || 'Error al obtener canciones')
       }
 
       const { tracks } = (await res.json()) as { tracks: SpotifyTrack[] }
-
       const minRequired = gridSize * gridSize - preMarkedCount
+
       if (tracks.length < minRequired) {
-        setError(
-          `Esta playlist no tiene suficientes canciones. Se necesitan al menos ${minRequired} canciones para una grilla ${gridSize}×${gridSize}. La playlist tiene ${tracks.length} canciones.`
-        )
+        setError(`Playlist con pocas canciones. Necesitas ${minRequired}, tiene ${tracks.length}.`)
         setStep('config')
         return
       }
@@ -92,26 +79,15 @@ export default function NewGamePage() {
       const shuffledQueue = shuffle(tracks).map(t => t.id)
 
       const gameState: GameState = {
-        id: gameId,
-        config,
-        tracks,
-        shuffledQueue,
-        drawnIds: [],
-        status: 'playing',
-        createdAt: new Date().toISOString(),
+        id: gameId, config, tracks, shuffledQueue, drawnIds: [],
+        status: 'playing', createdAt: new Date().toISOString(),
       }
-
       localStorage.setItem(`game_${gameId}`, JSON.stringify(gameState))
 
       const historyEntry: GameHistoryEntry = {
-        id: gameId,
-        playlistName: selectedPlaylist.name,
-        playerCount,
-        gridSize,
-        date: new Date().toISOString(),
-        status: 'abandoned',
+        id: gameId, playlistName: selectedPlaylist.name, playerCount,
+        gridSize, date: new Date().toISOString(), status: 'abandoned',
       }
-
       const raw = localStorage.getItem(HISTORY_KEY)
       const history: GameHistoryEntry[] = raw ? JSON.parse(raw) : []
       history.push(historyEntry)
@@ -119,7 +95,7 @@ export default function NewGamePage() {
 
       await generatePDF(cards, config)
       router.push(`/dashboard/game/${gameId}`)
-    } catch (e) {
+    } catch {
       setError('Error al crear la partida')
       setStep('config')
     }
@@ -127,9 +103,22 @@ export default function NewGamePage() {
 
   if (step === 'loading') {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center">
-        <div className="text-center text-white">
-          <h1 className="text-4xl font-bold mb-4">Cargando playlists...</h1>
+      <main className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-2 border-[#1DB954] border-t-transparent rounded-full animate-spin" />
+          <p className="text-[#a3a3a3] text-sm">Cargando playlists...</p>
+        </div>
+      </main>
+    )
+  }
+
+  if (step === 'generating') {
+    return (
+      <main className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-10 h-10 border-2 border-[#1DB954] border-t-transparent rounded-full animate-spin" />
+          <p className="text-white font-semibold">Generando cartones...</p>
+          <p className="text-[#a3a3a3] text-sm">Esto puede tomar un momento</p>
         </div>
       </main>
     )
@@ -137,30 +126,38 @@ export default function NewGamePage() {
 
   if (step === 'pick-playlist') {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-green-400 to-green-600 p-6">
-        <div className="max-w-2xl mx-auto">
+      <main className="min-h-screen bg-[#0a0a0a] px-6 py-10">
+        <div className="max-w-xl mx-auto">
           <button
             onClick={() => router.back()}
-            className="text-white mb-6 hover:underline"
+            className="flex items-center gap-2 text-[#a3a3a3] hover:text-white transition mb-8 text-sm"
           >
-            ← Volver
+            <span>←</span> Volver
           </button>
-          <h1 className="text-4xl font-bold text-white mb-8">Elige una playlist</h1>
 
-          {error && <p className="text-red-200 mb-4">{error}</p>}
+          <h1 className="text-3xl font-bold text-white tracking-tight mb-1">Elige una playlist</h1>
+          <p className="text-[#a3a3a3] mb-8">Selecciona la playlist que se usará para el bingo</p>
+
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl p-4 mb-6 text-sm">
+              {error}
+            </div>
+          )}
 
           {playlists.length === 0 ? (
-            <p className="text-white text-center">No hay playlists disponibles</p>
+            <p className="text-[#a3a3a3] text-center py-16">No hay playlists disponibles</p>
           ) : (
-            <ul className="space-y-3">
+            <ul className="space-y-2">
               {playlists.map(p => (
                 <li key={p.id}>
                   <button
                     onClick={() => handleSelectPlaylist(p)}
-                    className="w-full bg-white/20 rounded-xl p-4 text-left text-white hover:bg-white/30 transition"
+                    className="w-full bg-[#141414] hover:bg-[#1e1e1e] border border-[#2a2a2a] hover:border-[#1DB954]/40 rounded-2xl p-4 text-left transition-all duration-150 group"
                   >
-                    <p className="font-bold text-lg">{p.name}</p>
-                    <p className="text-sm opacity-80">
+                    <p className="font-semibold text-white group-hover:text-[#1DB954] transition-colors">
+                      {p.name}
+                    </p>
+                    <p className="text-sm text-[#a3a3a3] mt-0.5">
                       {p.tracks?.total ?? '?'} canciones · {p.owner?.display_name || 'Spotify'}
                     </p>
                   </button>
@@ -173,82 +170,88 @@ export default function NewGamePage() {
     )
   }
 
-  if (step === 'generating') {
-    return (
-      <main className="min-h-screen bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center">
-        <div className="text-center text-white">
-          <h1 className="text-4xl font-bold mb-4">Generando cartones...</h1>
-          <p className="text-lg opacity-75">Esto puede tomar un momento...</p>
-        </div>
-      </main>
-    )
-  }
-
   return (
-    <main className="min-h-screen bg-gradient-to-br from-green-400 to-green-600 p-6">
+    <main className="min-h-screen bg-[#0a0a0a] px-6 py-10">
       <div className="max-w-md mx-auto">
         <button
-          onClick={() => {
-            setStep('pick-playlist')
-            setSelectedPlaylist(null)
-          }}
-          className="text-white mb-6 hover:underline"
+          onClick={() => { setStep('pick-playlist'); setSelectedPlaylist(null) }}
+          className="flex items-center gap-2 text-[#a3a3a3] hover:text-white transition mb-8 text-sm"
         >
-          ← Cambiar playlist
+          <span>←</span> Cambiar playlist
         </button>
 
-        <h1 className="text-3xl font-bold text-white mb-2">Configurar partida</h1>
-        <p className="text-green-100 mb-8">{selectedPlaylist?.name}</p>
+        <h1 className="text-3xl font-bold text-white tracking-tight mb-1">Configurar partida</h1>
+        <p className="text-[#1DB954] font-medium mb-8">{selectedPlaylist?.name}</p>
 
-        {error && <p className="text-red-200 mb-4">{error}</p>}
+        {error && (
+          <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl p-4 mb-6 text-sm">
+            {error}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="block text-white font-bold mb-2">Número de jugadores</label>
-            <input
-              type="number"
-              min="1"
-              max="500"
-              value={playerCount}
-              onChange={e => setPlayerCount(parseInt(e.target.value))}
-              className="w-full px-4 py-2 rounded-lg"
-            />
-            <p className="text-green-100 text-sm mt-1">
-              Mínimo {minSongsRequired} canciones (más canciones = más variedad)
-            </p>
-          </div>
+          <div className="bg-[#141414] border border-[#2a2a2a] rounded-2xl p-5 space-y-5">
+            <div>
+              <label className="block text-sm font-semibold text-[#a3a3a3] uppercase tracking-wider mb-3">
+                Número de jugadores
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="500"
+                value={playerCount}
+                onChange={e => setPlayerCount(parseInt(e.target.value))}
+                className="w-full bg-[#0a0a0a] border border-[#2a2a2a] focus:border-[#1DB954] text-white px-4 py-3 rounded-xl outline-none transition text-lg font-semibold"
+              />
+              <p className="text-xs text-[#a3a3a3] mt-2">
+                Se necesitan al menos {minSongsRequired} canciones
+              </p>
+            </div>
 
-          <div>
-            <label className="block text-white font-bold mb-2">Tamaño de grilla</label>
-            <select
-              value={gridSize}
-              onChange={e => setGridSize(parseInt(e.target.value) as 4 | 5)}
-              className="w-full px-4 py-2 rounded-lg"
-            >
-              <option value="4">4×4 (16 casillas)</option>
-              <option value="5">5×5 (25 casillas)</option>
-            </select>
-          </div>
+            <div className="border-t border-[#2a2a2a] pt-5">
+              <label className="block text-sm font-semibold text-[#a3a3a3] uppercase tracking-wider mb-3">
+                Tamaño de grilla
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                {([4, 5] as const).map(size => (
+                  <button
+                    key={size}
+                    type="button"
+                    onClick={() => setGridSize(size)}
+                    className={`py-3 rounded-xl font-semibold text-sm transition-all ${
+                      gridSize === size
+                        ? 'bg-[#1DB954] text-black'
+                        : 'bg-[#0a0a0a] border border-[#2a2a2a] text-[#a3a3a3] hover:border-[#1DB954]/40'
+                    }`}
+                  >
+                    {size}×{size}
+                  </button>
+                ))}
+              </div>
+            </div>
 
-          <div>
-            <label className="block text-white font-bold mb-2">
-              Casillas pre-marcadas: {preMarkedCount}
-            </label>
-            <p className="text-green-100 text-sm mb-2">1 = solo el centro</p>
-            <input
-              type="range"
-              min="1"
-              max="5"
-              value={preMarkedCount}
-              onChange={e => setPreMarkedCount(parseInt(e.target.value))}
-              className="w-full"
-            />
+            <div className="border-t border-[#2a2a2a] pt-5">
+              <label className="block text-sm font-semibold text-[#a3a3a3] uppercase tracking-wider mb-1">
+                Casillas pre-marcadas
+              </label>
+              <p className="text-xs text-[#a3a3a3] mb-3">1 = solo el centro</p>
+              <div className="flex items-center gap-4">
+                <input
+                  type="range"
+                  min="1"
+                  max="5"
+                  value={preMarkedCount}
+                  onChange={e => setPreMarkedCount(parseInt(e.target.value))}
+                  className="flex-1 accent-[#1DB954]"
+                />
+                <span className="text-white font-bold text-lg w-6 text-center">{preMarkedCount}</span>
+              </div>
+            </div>
           </div>
 
           <button
             type="submit"
-            disabled={step !== 'config'}
-            className="w-full py-4 bg-black text-white text-xl font-bold rounded-2xl hover:bg-gray-800 transition disabled:opacity-50"
+            className="w-full py-4 bg-[#1DB954] hover:bg-[#1aa34a] text-black font-bold text-base rounded-2xl transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]"
           >
             Generar Cartones
           </button>
