@@ -151,7 +151,9 @@ export default function NewGamePage() {
                     className="w-full bg-white/20 rounded-xl p-4 text-left text-white hover:bg-white/30 transition"
                   >
                     <p className="font-bold text-lg">{p.name}</p>
-                    <p className="text-sm opacity-80">{p.tracks.total} canciones</p>
+                    <p className="text-sm opacity-80">
+                      {p.tracks?.total ?? '?'} canciones
+                    </p>
                   </button>
                 </li>
               ))}
