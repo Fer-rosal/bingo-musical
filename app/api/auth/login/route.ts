@@ -46,9 +46,9 @@ export async function GET() {
   })
 
   response.cookies.set('spotify_auth_state', state, {
-    httpOnly: true,
+    httpOnly: false,
     secure: true,
-    sameSite: 'none',
+    sameSite: 'lax',
     maxAge: 60 * 10, // 10 minutes
     path: '/',
   })
