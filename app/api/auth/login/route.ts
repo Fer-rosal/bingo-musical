@@ -25,7 +25,26 @@ export async function GET() {
 
   const spotifyAuthUrl = `https://accounts.spotify.com/authorize?${params.toString()}`
 
-  const response = NextResponse.redirect(spotifyAuthUrl)
+  const html = `
+    <!DOCTYPE html>
+    <html>
+      <head>
+        <title>Redirecting to Spotify...</title>
+      </head>
+      <body>
+        <p>Redirecting to Spotify...</p>
+        <script>
+          window.location.href = '${spotifyAuthUrl}';
+        </script>
+      </body>
+    </html>
+  `
+
+  const response = new NextResponse(html, {
+    status: 200,
+    headers: { 'Content-Type': 'text/html' },
+  })
+
   response.cookies.set('spotify_auth_state', state, {
     httpOnly: true,
     secure: true,
