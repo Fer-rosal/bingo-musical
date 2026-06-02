@@ -19,10 +19,17 @@ export async function GET(
     const tracks = await getPlaylistTracks(token, id)
     return NextResponse.json({ tracks })
   } catch (e) {
-    if (e instanceof SpotifyError && e.status === 401) {
+    console.error('Error fetching playlist tracks:', e)
+    if (e instanceof SpotifyError) {
+      if (e.status === 401) {
+        return NextResponse.json(
+          { error: 'Token expirado' },
+          { status: 401 }
+        )
+      }
       return NextResponse.json(
-        { error: 'Token expirado' },
-        { status: 401 }
+        { error: `Spotify error: ${e.message}` },
+        { status: 500 }
       )
     }
     return NextResponse.json(
