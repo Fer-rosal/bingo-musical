@@ -11,6 +11,7 @@ export interface SpotifyTrack {
   id: string
   name: string
   artists: { name: string }[]
+  preview_url?: string | null
 }
 
 export interface GameConfig {

@@ -99,16 +99,18 @@ export async function generatePDF(cards: BingoCard[], config: GameConfig): Promi
           doc.setFillColor(254, 240, 138)
           doc.rect(x, y, cellW, cellH, 'F')
           doc.setFontSize(20)
-          doc.text('★', x + cellW / 2, y + cellH / 2 + 4, { align: 'center' })
+          doc.text('X', x + cellW / 2, y + cellH / 2 + 4, { align: 'center' })
         } else {
           const padding = 2
           const availW = cellW - padding * 2
           let fontSize = 10
           let lines: string[] = []
 
+          const trackName = track.name.replace(/[̀-ͯ]/g, '')
+
           while (fontSize >= 5) {
             doc.setFontSize(fontSize)
-            lines = doc.splitTextToSize(track.name, availW)
+            lines = doc.splitTextToSize(trackName, availW)
             if (lines.length <= 3) break
             fontSize -= 0.5
           }

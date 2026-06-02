@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import type { GameState, GameHistoryEntry } from '../../../../types/bingo'
 
@@ -10,12 +10,14 @@ export default function GamePage() {
   const router = useRouter()
   const params = useParams()
   const gameId = params.id as string
+  const audioRef = useRef<HTMLAudioElement>(null)
 
   const [game, setGame] = useState<GameState | null>(null)
   const [status, setStatus] = useState<'playing' | 'line-check' | 'bingo-check' | 'finished'>(
     'playing'
   )
   const [mounted, setMounted] = useState(false)
+  const [isPlaying, setIsPlaying] = useState(false)
 
   useEffect(() => {
     const raw = localStorage.getItem(`game_${gameId}`)
@@ -29,6 +31,28 @@ export default function GamePage() {
     setStatus(gameState.status)
     setMounted(true)
   }, [gameId, router])
+
+  useEffect(() => {
+    if (!game || !audioRef.current) return
+
+    const currentTrack = game.tracks.find(t => t.id === game.drawnIds.at(-1))
+    if (currentTrack?.preview_url) {
+      audioRef.current.src = currentTrack.preview_url
+      audioRef.current.play().catch(() => setIsPlaying(false))
+      setIsPlaying(true)
+    }
+  }, [game?.drawnIds])
+
+  const togglePlayPause = () => {
+    if (!audioRef.current) return
+    if (isPlaying) {
+      audioRef.current.pause()
+      setIsPlaying(false)
+    } else {
+      audioRef.current.play().catch(() => setIsPlaying(false))
+      setIsPlaying(true)
+    }
+  }
 
   const revealNext = () => {
     if (!game || status !== 'playing') return
@@ -101,9 +125,27 @@ export default function GamePage() {
           {currentTrack ? (
             <div>
               <p className="text-3xl font-bold text-black mb-2">{currentTrack.name}</p>
-              <p className="text-lg text-gray-600">
+              <p className="text-lg text-gray-600 mb-4">
                 {currentTrack.artists.map(a => a.name).join(', ')}
               </p>
+              {currentTrack.preview_url ? (
+                <div className="flex items-center gap-3">
+                  <button
+                    onClick={togglePlayPause}
+                    className="px-6 py-2 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 transition"
+                  >
+                    {isPlaying ? '⏸ PAUSAR' : '▶ REPRODUCIR'}
+                  </button>
+                  <audio
+                    ref={audioRef}
+                    onEnded={() => setIsPlaying(false)}
+                    onPlay={() => setIsPlaying(true)}
+                    onPause={() => setIsPlaying(false)}
+                  />
+                </div>
+              ) : (
+                <p className="text-sm text-gray-400">No hay vista previa disponible</p>
+              )}
             </div>
           ) : (
             <p className="text-2xl text-gray-400">Haz clic para revelar la primera canción</p>
