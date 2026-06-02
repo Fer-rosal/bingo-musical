@@ -161,7 +161,7 @@ export default function NewGamePage() {
                   >
                     <p className="font-bold text-lg">{p.name}</p>
                     <p className="text-sm opacity-80">
-                      {p.tracks?.total ?? '?'} canciones
+                      {p.tracks?.total ?? '?'} canciones · {p.owner?.display_name || 'Spotify'}
                     </p>
                   </button>
                 </li>

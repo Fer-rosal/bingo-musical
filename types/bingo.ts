@@ -3,6 +3,8 @@ export interface SpotifyPlaylist {
   name: string
   images: { url: string }[]
   tracks: { total: number }
+  owner?: { display_name: string }
+  collaborative?: boolean
 }
 
 export interface SpotifyTrack {
