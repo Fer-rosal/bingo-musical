@@ -63,7 +63,10 @@ export default function NewGamePage() {
         router.push('/api/auth/login')
         return
       }
-      if (!res.ok) throw new Error('Error al obtener canciones')
+      if (!res.ok) {
+        const { error } = await res.json()
+        throw new Error(error || 'Error al obtener canciones')
+      }
 
       const { tracks } = (await res.json()) as { tracks: SpotifyTrack[] }
 

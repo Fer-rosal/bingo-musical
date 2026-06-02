@@ -27,9 +27,15 @@ export async function GET(
           { status: 401 }
         )
       }
+      if (e.status === 403) {
+        return NextResponse.json(
+          { error: 'No tienes permiso para acceder a esta playlist. Puede ser privada o estar restringida.' },
+          { status: 403 }
+        )
+      }
       return NextResponse.json(
         { error: `Spotify error: ${e.message}` },
-        { status: 500 }
+        { status: e.status }
       )
     }
     return NextResponse.json(
