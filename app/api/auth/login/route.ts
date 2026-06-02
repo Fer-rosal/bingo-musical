@@ -34,6 +34,8 @@ export async function GET() {
       <body>
         <p>Redirecting to Spotify...</p>
         <script>
+          // Check if cookie was set
+          console.log('Cookies before redirect:', document.cookie);
           window.location.href = '${spotifyAuthUrl}';
         </script>
       </body>
@@ -53,5 +55,6 @@ export async function GET() {
     path: '/',
   })
 
+  console.log('Set oauth state cookie:', state)
   return response
 }

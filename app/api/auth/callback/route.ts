@@ -22,6 +22,13 @@ export async function GET(request: NextRequest) {
 
   // Verify state parameter to prevent CSRF attacks
   const storedState = request.cookies.get('spotify_auth_state')?.value
+  console.log('OAuth callback debug:', {
+    receivedState: state,
+    storedState,
+    allCookies: request.cookies.getAll().map(c => c.name),
+    headers: Object.fromEntries(request.headers),
+  })
+
   if (!storedState || storedState !== state) {
     return NextResponse.json(
       { error: `State mismatch. Possible CSRF attack. Received: ${state}, Expected: ${storedState}` },
