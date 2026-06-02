@@ -40,37 +40,48 @@ export default function GamePage() {
   }, [gameId, router])
 
   useEffect(() => {
-    const token = document.cookie
-      .split('; ')
-      .find(row => row.startsWith('spotify_access_token='))
-      ?.split('=')[1]
+    let isMounted = true
 
-    if (!token) return
+    const initPlayer = async () => {
+      try {
+        const res = await fetch('/api/auth/token')
+        if (!res.ok) return
 
-    window.onSpotifyWebPlaybackSDKReady = () => {
-      const spotifyPlayer = new window.Spotify.Player({
-        name: 'Bingo Musical',
-        getOAuthToken: (callback: (token: string) => void) => callback(token),
-        volume: 0.5,
-      })
+        const { token } = await res.json()
 
-      spotifyPlayer.addListener('player_state_changed', (state: any) => {
-        if (state) {
-          setIsPlaying(!state.paused)
+        window.onSpotifyWebPlaybackSDKReady = () => {
+          if (!isMounted) return
+
+          const spotifyPlayer = new window.Spotify.Player({
+            name: 'Bingo Musical',
+            getOAuthToken: (callback: (token: string) => void) => callback(token),
+            volume: 0.5,
+          })
+
+          spotifyPlayer.addListener('player_state_changed', (state: any) => {
+            if (state) {
+              setIsPlaying(!state.paused)
+            }
+          })
+
+          spotifyPlayer.connect().then((success: boolean) => {
+            if (success && isMounted) setPlayer(spotifyPlayer)
+          })
         }
-      })
 
-      spotifyPlayer.connect().then((success: boolean) => {
-        if (success) setPlayer(spotifyPlayer)
-      })
+        const script = document.createElement('script')
+        script.src = 'https://sdk.scdn.co/spotify-player.js'
+        script.async = true
+        document.body.appendChild(script)
+      } catch (e) {
+        console.error('Failed to init Spotify player:', e)
+      }
     }
 
-    const script = document.createElement('script')
-    script.src = 'https://sdk.scdn.co/spotify-player.js'
-    script.async = true
-    document.body.appendChild(script)
+    initPlayer()
 
     return () => {
+      isMounted = false
       if (player) player.disconnect()
     }
   }, [])
@@ -78,27 +89,37 @@ export default function GamePage() {
   useEffect(() => {
     if (!game || !player) return
 
-    const currentTrack = game.tracks.find(t => t.id === game.drawnIds.at(-1))
-    if (currentTrack) {
-      const trackUri = `spotify:track:${currentTrack.id}`
-      player.getCurrentState().then((state: any) => {
+    const playTrack = async () => {
+      const currentTrack = game.tracks.find(t => t.id === game.drawnIds.at(-1))
+      if (!currentTrack) return
+
+      try {
+        const tokenRes = await fetch('/api/auth/token')
+        if (!tokenRes.ok) return
+
+        const { token } = await tokenRes.json()
+        const trackUri = `spotify:track:${currentTrack.id}`
+
+        const state = await player.getCurrentState()
         if (state === null) {
           console.log('No playback device available')
-        } else {
-          fetch('https://api.spotify.com/v1/me/player/play', {
-            method: 'PUT',
-            headers: {
-              Authorization: `Bearer ${document.cookie
-                .split('; ')
-                .find(row => row.startsWith('spotify_access_token='))
-                ?.split('=')[1]}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ uris: [trackUri] }),
-          }).catch(() => console.log('Failed to play track'))
+          return
         }
-      })
+
+        await fetch('https://api.spotify.com/v1/me/player/play', {
+          method: 'PUT',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ uris: [trackUri] }),
+        })
+      } catch (e) {
+        console.error('Failed to play track:', e)
+      }
     }
+
+    playTrack()
   }, [game?.drawnIds, player])
 
   const revealNext = () => {
