@@ -92,7 +92,7 @@ export async function getPlaylistTracks(
   playlistId: string
 ): Promise<SpotifyTrack[]> {
   const items: SpotifyTrack[] = []
-  let url = `/playlists/${playlistId}/tracks?limit=100&offset=0&fields=next,items(track(id,name,artists))`
+  let url = `/playlists/${playlistId}/tracks?limit=50`
 
   while (url) {
     const page = await spotifyFetch<{
