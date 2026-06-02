@@ -25,6 +25,8 @@ export default function GamePage() {
   const [mounted, setMounted] = useState(false)
   const [isPlaying, setIsPlaying] = useState(false)
   const [player, setPlayer] = useState<any>(null)
+  const [playerReady, setPlayerReady] = useState(false)
+  const [deviceError, setDeviceError] = useState('')
 
   useEffect(() => {
     const raw = localStorage.getItem(`game_${gameId}`)
@@ -64,8 +66,31 @@ export default function GamePage() {
             }
           })
 
+          spotifyPlayer.addListener('ready', ({ device_id }: any) => {
+            console.log('Spotify Player ready with device:', device_id)
+            if (isMounted) setPlayerReady(true)
+          })
+
+          spotifyPlayer.addListener('not_ready', ({ device_id }: any) => {
+            console.log('Device not ready:', device_id)
+            if (isMounted) setPlayerReady(false)
+          })
+
+          spotifyPlayer.addListener('initialization_error', ({ message }: any) => {
+            console.error('Init error:', message)
+            if (isMounted) setDeviceError('Error inicializando: ' + message)
+          })
+
+          spotifyPlayer.addListener('authentication_error', ({ message }: any) => {
+            console.error('Auth error:', message)
+            if (isMounted) setDeviceError('Error de autenticación')
+          })
+
           spotifyPlayer.connect().then((success: boolean) => {
-            if (success && isMounted) setPlayer(spotifyPlayer)
+            if (success && isMounted) {
+              setPlayer(spotifyPlayer)
+              console.log('Player connected')
+            }
           })
         }
 
@@ -201,13 +226,24 @@ export default function GamePage() {
               <p className="text-lg text-gray-600 mb-4">
                 {currentTrack.artists.map(a => a.name).join(', ')}
               </p>
+              {deviceError && (
+                <p className="text-sm text-red-600 mb-3">{deviceError}</p>
+              )}
               {player ? (
-                <button
-                  onClick={togglePlayPause}
-                  className="px-6 py-2 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 transition"
-                >
-                  {isPlaying ? '⏸ PAUSAR' : '▶ REPRODUCIR'}
-                </button>
+                <>
+                  {!playerReady && (
+                    <p className="text-sm text-amber-600 mb-3">
+                      ⚠️ Abre Spotify en otra pestaña para activar un dispositivo
+                    </p>
+                  )}
+                  <button
+                    onClick={togglePlayPause}
+                    disabled={!playerReady}
+                    className="px-6 py-2 bg-green-500 text-white font-bold rounded-lg hover:bg-green-600 transition disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isPlaying ? '⏸ PAUSAR' : '▶ REPRODUCIR'}
+                  </button>
+                </>
               ) : (
                 <p className="text-sm text-gray-400">Cargando reproductor de Spotify...</p>
               )}
