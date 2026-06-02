@@ -77,6 +77,16 @@ export async function refreshAccessToken(
   }
 }
 
+export async function getPlaylistInfo(
+  token: string,
+  playlistId: string
+): Promise<SpotifyPlaylist> {
+  return spotifyFetch<SpotifyPlaylist>(
+    `/playlists/${playlistId}`,
+    token
+  )
+}
+
 export async function getPlaylistTracks(
   token: string,
   playlistId: string
