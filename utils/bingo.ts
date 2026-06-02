@@ -44,129 +44,125 @@ export function generateAllCards(tracks: SpotifyTrack[], config: GameConfig): Bi
   )
 }
 
-function buildCardHTML(card: BingoCard, config: GameConfig): string {
-  const { gridSize, playlistName } = config
-  const cellSize = gridSize === 4 ? 110 : 90
-  const fontSize = gridSize === 4 ? 11 : 10
-  const gridPx = cellSize * gridSize
+// pt to mm: 1pt = 0.352778mm; line height ~1.25x
+const PT_TO_MM = 0.352778
+const LINE_LEADING = 1.25
 
-  const cells = card.grid.flat().map(track => {
-    if (track === null) {
-      return `
-        <div style="
-          width:${cellSize}px; height:${cellSize}px;
-          background:#f0f0f0;
-          display:flex; align-items:center; justify-content:center;
-          border:1.5px solid #000;
-          box-sizing:border-box;
-        ">
-          <span style="font-size:28px; font-weight:900; color:#000;">✕</span>
-        </div>`
-    }
-
-    const artist = track.artists.map(a => a.name).join(', ')
-    return `
-      <div style="
-        width:${cellSize}px; height:${cellSize}px;
-        background:#fff;
-        border:1.5px solid #000;
-        display:flex; flex-direction:column; align-items:center; justify-content:center;
-        padding:6px; box-sizing:border-box; overflow:hidden; text-align:center;
-      ">
-        <span style="
-          font-size:${fontSize}px; font-weight:700; color:#000; line-height:1.3;
-          display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
-        ">${escapeHtml(track.name)}</span>
-        <span style="
-          font-size:${fontSize - 1.5}px; color:#555; margin-top:3px; line-height:1.2;
-          display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
-        ">${escapeHtml(artist)}</span>
-      </div>`
-  }).join('')
-
-  return `
-    <div style="
-      width:${gridPx}px;
-      background:#fff;
-      font-family: system-ui, -apple-system, 'Helvetica Neue', sans-serif;
-      border:2px solid #000;
-    ">
-      <div style="
-        background:#000;
-        padding:10px 14px;
-        display:flex; align-items:center; justify-content:space-between;
-      ">
-        <span style="color:#fff; font-weight:700; font-size:13px; letter-spacing:0.02em;">
-          ♫ ${escapeHtml(playlistName)}
-        </span>
-        <span style="
-          color:#000; background:#fff; font-weight:800; font-size:12px;
-          padding:2px 10px; border-radius:99px;
-        ">#${card.id}</span>
-      </div>
-      <div style="display:grid; grid-template-columns:repeat(${gridSize}, ${cellSize}px);">
-        ${cells}
-      </div>
-    </div>`
-}
-
-function escapeHtml(str: string): string {
-  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+function fitText(doc: any, text: string, maxW: number, maxH: number, startSize: number, minSize: number): { lines: string[]; fontSize: number } {
+  let fontSize = startSize
+  while (fontSize >= minSize) {
+    doc.setFontSize(fontSize)
+    const lines: string[] = doc.splitTextToSize(text, maxW)
+    const totalH = lines.length * fontSize * PT_TO_MM * LINE_LEADING
+    if (totalH <= maxH) return { lines, fontSize }
+    fontSize -= 0.5
+  }
+  doc.setFontSize(minSize)
+  return { lines: doc.splitTextToSize(text, maxW), fontSize: minSize }
 }
 
 export async function generatePDF(cards: BingoCard[], config: GameConfig): Promise<void> {
-  const [{ jsPDF }, html2canvas] = await Promise.all([
-    import('jspdf'),
-    import('html2canvas').then(m => m.default),
-  ])
+  const { jsPDF } = await import('jspdf')
+  const { gridSize, playlistName } = config
+
+  // Full A4, no margins, one card per page
+  const pageW = 210
+  const pageH = 297
+  const headerH = 7
+  const gridW = pageW
+  const gridH = pageH - headerH
+  const cellW = gridW / gridSize
+  const cellH = gridH / gridSize
+  const pad = 2 // cell inner padding mm
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' }) as any
-  const pageW = doc.getPageWidth()
-  const pageH = doc.getPageHeight()
-  const marginMm = 8
-  const usableW = pageW - marginMm * 2
-  const container = document.createElement('div')
-  container.style.cssText = 'position:fixed; left:-9999px; top:0; background:#0a0a0a;'
-  document.body.appendChild(container)
 
-  try {
-    for (let i = 0; i < cards.length; i++) {
-      const isSecond = i % 2 === 1
+  for (let i = 0; i < cards.length; i++) {
+    const card = cards[i]
+    if (i > 0) doc.addPage()
 
-      if (i > 0 && i % 2 === 0) doc.addPage()
+    // ── Header strip ──────────────────────────────────────────────
+    doc.setFillColor(0, 0, 0)
+    doc.rect(0, 0, pageW, headerH, 'F')
+    doc.setTextColor(255, 255, 255)
+    doc.setFontSize(6)
+    doc.setFont('helvetica', 'bold')
+    doc.text(
+      `#${card.id}  ${playlistName.toUpperCase()}`,
+      pageW / 2,
+      headerH / 2 + 1,
+      { align: 'center' }
+    )
 
-      const wrapper = document.createElement('div')
-      wrapper.innerHTML = buildCardHTML(cards[i], config)
-      container.appendChild(wrapper)
+    // ── Grid cells ────────────────────────────────────────────────
+    card.grid.forEach((row, r) => {
+      row.forEach((track, c) => {
+        const x = c * cellW
+        const y = headerH + r * cellH
 
-      const el = wrapper.firstElementChild as HTMLElement
-      const canvas = await html2canvas(el, {
-        backgroundColor: '#0a0a0a',
-        scale: 2,
-        useCORS: true,
-        logging: false,
+        doc.setDrawColor(0, 0, 0)
+        doc.setLineWidth(0.15)
+        doc.rect(x, y, cellW, cellH)
+
+        if (track === null) {
+          // Free cell: light fill, bold X
+          doc.setFillColor(230, 230, 230)
+          doc.rect(x, y, cellW, cellH, 'F')
+          doc.setDrawColor(0, 0, 0)
+          doc.setLineWidth(0.15)
+          doc.rect(x, y, cellW, cellH)
+          doc.setTextColor(0, 0, 0)
+          doc.setFontSize(22)
+          doc.setFont('helvetica', 'bold')
+          doc.text('X', x + cellW / 2, y + cellH / 2 + 4, { align: 'center' })
+        } else {
+          const availW = cellW - pad * 2
+          const availH = cellH - pad * 2
+
+          // Song name — maximize font, use up to 70% of cell height
+          const nameMaxH = availH * 0.68
+          doc.setFont('helvetica', 'bold')
+          const { lines: nameLines, fontSize: nameFSize } = fitText(
+            doc, track.name, availW, nameMaxH, 14, 6
+          )
+
+          // Artist — remaining space
+          const nameBlockH = nameLines.length * nameFSize * PT_TO_MM * LINE_LEADING
+          const artistMaxH = availH - nameBlockH - 1
+          const artistText = track.artists.map(a => a.name).join(', ')
+          doc.setFont('helvetica', 'normal')
+          const { lines: artistLines, fontSize: artistFSize } = fitText(
+            doc, artistText, availW, artistMaxH, nameFSize * 0.72, 5
+          )
+
+          // Vertical centering
+          const artistBlockH = artistLines.length * artistFSize * PT_TO_MM * LINE_LEADING
+          const totalBlockH = nameBlockH + artistBlockH + (artistLines.length ? 1 : 0)
+          let curY = y + (cellH - totalBlockH) / 2 + nameFSize * PT_TO_MM
+
+          // Draw song name
+          doc.setFontSize(nameFSize)
+          doc.setFont('helvetica', 'bold')
+          doc.setTextColor(0, 0, 0)
+          nameLines.forEach((line: string) => {
+            doc.text(line, x + cellW / 2, curY, { align: 'center' })
+            curY += nameFSize * PT_TO_MM * LINE_LEADING
+          })
+
+          // Draw artist name
+          if (artistLines.length) {
+            curY += 0.5
+            doc.setFontSize(artistFSize)
+            doc.setFont('helvetica', 'normal')
+            doc.setTextColor(80, 80, 80)
+            artistLines.forEach((line: string) => {
+              doc.text(line, x + cellW / 2, curY, { align: 'center' })
+              curY += artistFSize * PT_TO_MM * LINE_LEADING
+            })
+          }
+        }
       })
-
-      const imgData = canvas.toDataURL('image/png')
-      const canvasW = canvas.width / 2
-      const canvasH = canvas.height / 2
-
-      const mmW = usableW
-      const mmH = (canvasH / canvasW) * mmW
-      const yPos = isSecond ? pageH / 2 + marginMm : marginMm
-
-      doc.addImage(imgData, 'PNG', marginMm, yPos, mmW, mmH)
-
-      if (!isSecond) {
-        doc.setDrawColor(42, 42, 42)
-        doc.setLineWidth(0.3)
-        doc.line(marginMm, pageH / 2, pageW - marginMm, pageH / 2)
-      }
-
-      container.removeChild(wrapper)
-    }
-  } finally {
-    document.body.removeChild(container)
+    })
   }
 
   doc.save('bingo-musical-cartones.pdf')
