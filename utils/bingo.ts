@@ -12,19 +12,13 @@ export function shuffle<T>(arr: T[]): T[] {
 export function getPreMarkedIndices(gridSize: 4 | 5, count: number): number[] {
   const total = gridSize * gridSize
   const center = Math.floor(total / 2)
-
   if (count <= 1) return [center]
-
   const pool = Array.from({ length: total }, (_, i) => i).filter(i => i !== center)
   const extras = shuffle(pool).slice(0, count - 1)
   return [center, ...extras]
 }
 
-export function generateCard(
-  cardId: number,
-  tracks: SpotifyTrack[],
-  config: GameConfig
-): BingoCard {
+export function generateCard(cardId: number, tracks: SpotifyTrack[], config: GameConfig): BingoCard {
   const { gridSize, preMarkedCount } = config
   const size = gridSize * gridSize
   const freeIndices = new Set(getPreMarkedIndices(gridSize, preMarkedCount))
@@ -50,85 +44,138 @@ export function generateAllCards(tracks: SpotifyTrack[], config: GameConfig): Bi
   )
 }
 
+function buildCardHTML(card: BingoCard, config: GameConfig): string {
+  const { gridSize, playlistName } = config
+  const cellSize = gridSize === 4 ? 110 : 90
+  const fontSize = gridSize === 4 ? 11 : 10
+  const gridPx = cellSize * gridSize
+
+  const cells = card.grid.flat().map(track => {
+    if (track === null) {
+      return `
+        <div style="
+          width:${cellSize}px; height:${cellSize}px;
+          background:#1DB954;
+          display:flex; align-items:center; justify-content:center;
+          border:1px solid #2a2a2a;
+          box-sizing:border-box;
+        ">
+          <span style="font-size:26px; font-weight:900; color:#000;">✕</span>
+        </div>`
+    }
+
+    const artist = track.artists.map(a => a.name).join(', ')
+    return `
+      <div style="
+        width:${cellSize}px; height:${cellSize}px;
+        background:#141414;
+        border:1px solid #2a2a2a;
+        display:flex; flex-direction:column; align-items:center; justify-content:center;
+        padding:6px; box-sizing:border-box; overflow:hidden; text-align:center;
+      ">
+        <span style="
+          font-size:${fontSize}px; font-weight:700; color:#ffffff; line-height:1.3;
+          display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
+        ">${escapeHtml(track.name)}</span>
+        <span style="
+          font-size:${fontSize - 1}px; color:#a3a3a3; margin-top:3px; line-height:1.2;
+          display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+        ">${escapeHtml(artist)}</span>
+      </div>`
+  }).join('')
+
+  return `
+    <div style="
+      width:${gridPx}px;
+      background:#0a0a0a;
+      border-radius:12px;
+      overflow:hidden;
+      font-family: system-ui, -apple-system, 'Helvetica Neue', sans-serif;
+      border:1px solid #2a2a2a;
+    ">
+      <div style="
+        background:#0a0a0a;
+        padding:12px 16px;
+        display:flex; align-items:center; justify-content:space-between;
+        border-bottom:1px solid #2a2a2a;
+      ">
+        <div style="display:flex; align-items:center; gap:8px;">
+          <div style="
+            width:24px; height:24px; background:#1DB954; border-radius:50%;
+            display:flex; align-items:center; justify-content:center; font-size:13px;
+          ">♫</div>
+          <span style="color:#ffffff; font-weight:700; font-size:13px;">
+            ${escapeHtml(playlistName)}
+          </span>
+        </div>
+        <span style="
+          color:#000; background:#1DB954; font-weight:800; font-size:12px;
+          padding:2px 10px; border-radius:99px;
+        ">#${card.id}</span>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(${gridSize}, ${cellSize}px);">
+        ${cells}
+      </div>
+    </div>`
+}
+
+function escapeHtml(str: string): string {
+  return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
 export async function generatePDF(cards: BingoCard[], config: GameConfig): Promise<void> {
-  const { jsPDF } = await import('jspdf')
-  const { gridSize } = config
+  const [{ jsPDF }, html2canvas] = await Promise.all([
+    import('jspdf'),
+    import('html2canvas').then(m => m.default),
+  ])
 
   const doc = new jsPDF({ orientation: 'portrait', unit: 'mm', format: 'a4' }) as any
   const pageW = doc.getPageWidth()
   const pageH = doc.getPageHeight()
+  const marginMm = 8
+  const usableW = pageW - marginMm * 2
+  const container = document.createElement('div')
+  container.style.cssText = 'position:fixed; left:-9999px; top:0; background:#0a0a0a;'
+  document.body.appendChild(container)
 
-  const cartonH = pageH / 2
-  const cartonW = pageW
+  try {
+    for (let i = 0; i < cards.length; i++) {
+      const isSecond = i % 2 === 1
 
-  for (let i = 0; i < cards.length; i++) {
-    const card = cards[i]
-    const isSecond = i % 2 === 1
-    const yOffset = isSecond ? cartonH : 0
+      if (i > 0 && i % 2 === 0) doc.addPage()
 
-    if (i > 0 && i % 2 === 0) {
-      doc.addPage()
-    }
+      const wrapper = document.createElement('div')
+      wrapper.innerHTML = buildCardHTML(cards[i], config)
+      container.appendChild(wrapper)
 
-    const cellW = cartonW / gridSize
-    const cellH = cartonH / (gridSize + 1)
-    const headerH = cellH
-
-    doc.setFillColor(34, 197, 94)
-    doc.rect(0, yOffset, cartonW, headerH, 'F')
-    doc.setTextColor(255, 255, 255)
-    doc.setFontSize(14)
-    doc.text(
-      `CARTÓN #${card.id} — ${config.playlistName}`,
-      cartonW / 2,
-      yOffset + headerH / 2 + 2,
-      { align: 'center' }
-    )
-
-    doc.setTextColor(0, 0, 0)
-    card.grid.forEach((row, r) => {
-      row.forEach((track, c) => {
-        const x = c * cellW
-        const y = yOffset + headerH + r * cellH
-
-        doc.setDrawColor(100, 100, 100)
-        doc.setLineWidth(0.3)
-        doc.rect(x, y, cellW, cellH)
-
-        if (track === null) {
-          doc.setFillColor(254, 240, 138)
-          doc.rect(x, y, cellW, cellH, 'F')
-          doc.setFontSize(20)
-          doc.text('X', x + cellW / 2, y + cellH / 2 + 4, { align: 'center' })
-        } else {
-          const padding = 2
-          const availW = cellW - padding * 2
-          let fontSize = 10
-          let lines: string[] = []
-
-          const trackName = track.name.replace(/[̀-ͯ]/g, '')
-
-          while (fontSize >= 5) {
-            doc.setFontSize(fontSize)
-            lines = doc.splitTextToSize(trackName, availW)
-            if (lines.length <= 3) break
-            fontSize -= 0.5
-          }
-
-          const lineHeight = fontSize * 0.4
-          const totalTextH = lines.length * lineHeight
-          const startY = y + (cellH - totalTextH) / 2 + lineHeight
-          doc.setFontSize(fontSize)
-          doc.text(lines, x + cellW / 2, startY, { align: 'center' })
-        }
+      const el = wrapper.firstElementChild as HTMLElement
+      const canvas = await html2canvas(el, {
+        backgroundColor: '#0a0a0a',
+        scale: 2,
+        useCORS: true,
+        logging: false,
       })
-    })
 
-    if (!isSecond) {
-      doc.setDrawColor(0, 0, 0)
-      doc.setLineWidth(0.5)
-      doc.line(0, cartonH, pageW, cartonH)
+      const imgData = canvas.toDataURL('image/png')
+      const canvasW = canvas.width / 2
+      const canvasH = canvas.height / 2
+
+      const mmW = usableW
+      const mmH = (canvasH / canvasW) * mmW
+      const yPos = isSecond ? pageH / 2 + marginMm : marginMm
+
+      doc.addImage(imgData, 'PNG', marginMm, yPos, mmW, mmH)
+
+      if (!isSecond) {
+        doc.setDrawColor(42, 42, 42)
+        doc.setLineWidth(0.3)
+        doc.line(marginMm, pageH / 2, pageW - marginMm, pageH / 2)
+      }
+
+      container.removeChild(wrapper)
     }
+  } finally {
+    document.body.removeChild(container)
   }
 
   doc.save('bingo-musical-cartones.pdf')
