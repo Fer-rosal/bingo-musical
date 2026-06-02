@@ -112,7 +112,7 @@ export default function GamePage() {
   }, [])
 
   useEffect(() => {
-    if (!game || !player) return
+    if (!game || !player || !playerReady) return
 
     const playTrack = async () => {
       const currentTrack = game.tracks.find(t => t.id === game.drawnIds.at(-1))
@@ -125,11 +125,7 @@ export default function GamePage() {
         const { token } = await tokenRes.json()
         const trackUri = `spotify:track:${currentTrack.id}`
 
-        const state = await player.getCurrentState()
-        if (state === null) {
-          console.log('No playback device available')
-          return
-        }
+        console.log('Playing track:', trackUri)
 
         await fetch('https://api.spotify.com/v1/me/player/play', {
           method: 'PUT',
@@ -137,7 +133,13 @@ export default function GamePage() {
             Authorization: `Bearer ${token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({ uris: [trackUri] }),
+          body: JSON.stringify({
+            uris: [trackUri],
+            device_id: await player.getCurrentState().then((state: any) => state?.device?.id),
+          }),
+        }).then(r => {
+          if (!r.ok) throw new Error(`${r.status}`)
+          console.log('Track playing')
         })
       } catch (e) {
         console.error('Failed to play track:', e)
@@ -145,7 +147,7 @@ export default function GamePage() {
     }
 
     playTrack()
-  }, [game?.drawnIds, player])
+  }, [game?.drawnIds, player, playerReady])
 
   const revealNext = () => {
     if (!game || status !== 'playing') return
