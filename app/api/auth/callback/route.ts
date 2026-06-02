@@ -5,11 +5,14 @@ export async function GET(request: NextRequest) {
   const code = searchParams.get('code')
   const state = searchParams.get('state')
   const error = searchParams.get('error')
+  const origin = request.headers.get('x-forwarded-proto') && request.headers.get('x-forwarded-host')
+    ? `${request.headers.get('x-forwarded-proto')}://${request.headers.get('x-forwarded-host')}`
+    : request.nextUrl.origin
 
   // Check for authorization errors from Spotify
   if (error) {
     return NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL}?error=${encodeURIComponent(error)}`
+      `${origin}?error=${encodeURIComponent(error)}`
     )
   }
 
@@ -22,13 +25,6 @@ export async function GET(request: NextRequest) {
 
   // Verify state parameter to prevent CSRF attacks
   const storedState = request.cookies.get('spotify_auth_state')?.value
-  console.log('OAuth callback debug:', {
-    receivedState: state,
-    storedState,
-    allCookies: request.cookies.getAll().map(c => c.name),
-    headers: Object.fromEntries(request.headers),
-  })
-
   if (!storedState || storedState !== state) {
     return NextResponse.json(
       { error: `State mismatch. Possible CSRF attack. Received: ${state}, Expected: ${storedState}` },
@@ -77,7 +73,7 @@ export async function GET(request: NextRequest) {
 
     // Create response and set secure httpOnly cookies
     const response = NextResponse.redirect(
-      `${process.env.NEXT_PUBLIC_APP_URL}/dashboard`
+      `${origin}/dashboard`
     )
 
     response.cookies.set('spotify_access_token', access_token, {
