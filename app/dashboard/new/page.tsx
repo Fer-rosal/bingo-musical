@@ -19,11 +19,11 @@ export default function NewGamePage() {
   const [preMarkedCount, setPreMarkedCount] = useState(1)
   const [error, setError] = useState('')
 
-  const calculateMinSongs = (players: number, grid: 4 | 5, preMarked: number) => {
-    return (grid * grid - preMarked) * players
+  const calculateMinSongs = (grid: 4 | 5, preMarked: number) => {
+    return grid * grid - preMarked
   }
 
-  const minSongsRequired = calculateMinSongs(playerCount, gridSize, preMarkedCount)
+  const minSongsRequired = calculateMinSongs(gridSize, preMarkedCount)
 
   useEffect(() => {
     const fetchPlaylists = async () => {
@@ -67,10 +67,10 @@ export default function NewGamePage() {
 
       const { tracks } = (await res.json()) as { tracks: SpotifyTrack[] }
 
-      const minRequired = (gridSize * gridSize - preMarkedCount) * playerCount
+      const minRequired = gridSize * gridSize - preMarkedCount
       if (tracks.length < minRequired) {
         setError(
-          `Esta playlist no tiene suficientes canciones. Se necesitan al menos ${minRequired} canciones diferentes para ${playerCount} jugadores en una grilla ${gridSize}×${gridSize}. La playlist tiene ${tracks.length} canciones.`
+          `Esta playlist no tiene suficientes canciones. Se necesitan al menos ${minRequired} canciones para una grilla ${gridSize}×${gridSize}. La playlist tiene ${tracks.length} canciones.`
         )
         setStep('config')
         return
@@ -211,7 +211,7 @@ export default function NewGamePage() {
               className="w-full px-4 py-2 rounded-lg"
             />
             <p className="text-green-100 text-sm mt-1">
-              Requiere al menos {minSongsRequired} canciones diferentes
+              Mínimo {minSongsRequired} canciones (más canciones = más variedad)
             </p>
           </div>
 
