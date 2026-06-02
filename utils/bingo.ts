@@ -55,12 +55,12 @@ function buildCardHTML(card: BingoCard, config: GameConfig): string {
       return `
         <div style="
           width:${cellSize}px; height:${cellSize}px;
-          background:#1DB954;
+          background:#f0f0f0;
           display:flex; align-items:center; justify-content:center;
-          border:1px solid #2a2a2a;
+          border:1.5px solid #000;
           box-sizing:border-box;
         ">
-          <span style="font-size:26px; font-weight:900; color:#000;">✕</span>
+          <span style="font-size:28px; font-weight:900; color:#000;">✕</span>
         </div>`
     }
 
@@ -68,17 +68,17 @@ function buildCardHTML(card: BingoCard, config: GameConfig): string {
     return `
       <div style="
         width:${cellSize}px; height:${cellSize}px;
-        background:#141414;
-        border:1px solid #2a2a2a;
+        background:#fff;
+        border:1.5px solid #000;
         display:flex; flex-direction:column; align-items:center; justify-content:center;
         padding:6px; box-sizing:border-box; overflow:hidden; text-align:center;
       ">
         <span style="
-          font-size:${fontSize}px; font-weight:700; color:#ffffff; line-height:1.3;
+          font-size:${fontSize}px; font-weight:700; color:#000; line-height:1.3;
           display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
         ">${escapeHtml(track.name)}</span>
         <span style="
-          font-size:${fontSize - 1}px; color:#a3a3a3; margin-top:3px; line-height:1.2;
+          font-size:${fontSize - 1.5}px; color:#555; margin-top:3px; line-height:1.2;
           display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
         ">${escapeHtml(artist)}</span>
       </div>`
@@ -87,29 +87,20 @@ function buildCardHTML(card: BingoCard, config: GameConfig): string {
   return `
     <div style="
       width:${gridPx}px;
-      background:#0a0a0a;
-      border-radius:12px;
-      overflow:hidden;
+      background:#fff;
       font-family: system-ui, -apple-system, 'Helvetica Neue', sans-serif;
-      border:1px solid #2a2a2a;
+      border:2px solid #000;
     ">
       <div style="
-        background:#0a0a0a;
-        padding:12px 16px;
+        background:#000;
+        padding:10px 14px;
         display:flex; align-items:center; justify-content:space-between;
-        border-bottom:1px solid #2a2a2a;
       ">
-        <div style="display:flex; align-items:center; gap:8px;">
-          <div style="
-            width:24px; height:24px; background:#1DB954; border-radius:50%;
-            display:flex; align-items:center; justify-content:center; font-size:13px;
-          ">♫</div>
-          <span style="color:#ffffff; font-weight:700; font-size:13px;">
-            ${escapeHtml(playlistName)}
-          </span>
-        </div>
+        <span style="color:#fff; font-weight:700; font-size:13px; letter-spacing:0.02em;">
+          ♫ ${escapeHtml(playlistName)}
+        </span>
         <span style="
-          color:#000; background:#1DB954; font-weight:800; font-size:12px;
+          color:#000; background:#fff; font-weight:800; font-size:12px;
           padding:2px 10px; border-radius:99px;
         ">#${card.id}</span>
       </div>
