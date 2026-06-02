@@ -96,12 +96,12 @@ export async function getPlaylistTracks(
 
   while (url) {
     const page = await spotifyFetch<{
-      items: Array<{ track?: SpotifyTrack; video_thumbnail?: { url: string } } | null>
+      items: Array<{ item?: SpotifyTrack } | null>
       next: string | null
     }>(url, token)
 
     items.push(...page.items
-      .map(i => i?.track)
+      .map(i => i?.item)
       .filter((track): track is SpotifyTrack => track !== null && track !== undefined))
     url = page.next ? page.next.replace(SPOTIFY_BASE, '') : ''
   }
