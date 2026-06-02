@@ -65,13 +65,13 @@ export async function generatePDF(cards: BingoCard[], config: GameConfig): Promi
   const { jsPDF } = await import('jspdf')
   const { gridSize, playlistName } = config
 
-  // Full A4, no margins, one card per page
+  // 2 cards per A4, stacked vertically, no margins
   const pageW = 210
   const pageH = 297
+  const slotH = pageH / 2          // each card gets exactly half the page
   const headerH = 7
-  const gridW = pageW
-  const gridH = pageH - headerH
-  const cellW = gridW / gridSize
+  const gridH = slotH - headerH
+  const cellW = pageW / gridSize
   const cellH = gridH / gridSize
   const pad = 2 // cell inner padding mm
 
@@ -79,18 +79,30 @@ export async function generatePDF(cards: BingoCard[], config: GameConfig): Promi
 
   for (let i = 0; i < cards.length; i++) {
     const card = cards[i]
-    if (i > 0) doc.addPage()
+    const isSecond = i % 2 === 1
+    const slotY = isSecond ? slotH : 0
+
+    if (i > 0 && !isSecond) doc.addPage()
+
+    // ── Cut line between the two cards ───────────────────────────
+    if (isSecond) {
+      doc.setDrawColor(180, 180, 180)
+      doc.setLineWidth(0.2)
+      doc.setLineDash([2, 2])
+      doc.line(0, slotH, pageW, slotH)
+      doc.setLineDash([])
+    }
 
     // ── Header strip ──────────────────────────────────────────────
     doc.setFillColor(0, 0, 0)
-    doc.rect(0, 0, pageW, headerH, 'F')
+    doc.rect(0, slotY, pageW, headerH, 'F')
     doc.setTextColor(255, 255, 255)
     doc.setFontSize(6)
     doc.setFont('helvetica', 'bold')
     doc.text(
       `#${card.id}  ${playlistName.toUpperCase()}`,
       pageW / 2,
-      headerH / 2 + 1,
+      slotY + headerH / 2 + 1,
       { align: 'center' }
     )
 
@@ -98,7 +110,7 @@ export async function generatePDF(cards: BingoCard[], config: GameConfig): Promi
     card.grid.forEach((row, r) => {
       row.forEach((track, c) => {
         const x = c * cellW
-        const y = headerH + r * cellH
+        const y = slotY + headerH + r * cellH
 
         doc.setDrawColor(0, 0, 0)
         doc.setLineWidth(0.15)
