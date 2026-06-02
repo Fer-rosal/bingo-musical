@@ -92,15 +92,17 @@ export async function getPlaylistTracks(
   playlistId: string
 ): Promise<SpotifyTrack[]> {
   const items: SpotifyTrack[] = []
-  let url = `/playlists/${playlistId}/tracks?limit=50`
+  let url = `/playlists/${playlistId}/items?limit=50`
 
   while (url) {
     const page = await spotifyFetch<{
-      items: { track: SpotifyTrack | null }[]
+      items: Array<{ track?: SpotifyTrack; video_thumbnail?: { url: string } } | null>
       next: string | null
     }>(url, token)
 
-    items.push(...page.items.map(i => i.track).filter(Boolean) as SpotifyTrack[])
+    items.push(...page.items
+      .map(i => i?.track)
+      .filter((track): track is SpotifyTrack => track !== null && track !== undefined))
     url = page.next ? page.next.replace(SPOTIFY_BASE, '') : ''
   }
 
