@@ -100,7 +100,7 @@ export async function getPlaylistTracks(
       next: string | null
     }>(url, token)
 
-    items.push(...page.items
+    const pageTracks = page.items
       .map(i => {
         const track = i?.item
         if (!track) return null
@@ -109,9 +109,10 @@ export async function getPlaylistTracks(
           name: track.name,
           artists: track.artists,
           preview_url: track.preview_url,
-        }
+        } as SpotifyTrack
       })
-      .filter((track): track is SpotifyTrack => track !== null && track !== undefined))
+      .filter((track): track is SpotifyTrack => track !== null)
+    items.push(...pageTracks)
     url = page.next ? page.next.replace(SPOTIFY_BASE, '') : ''
   }
 
