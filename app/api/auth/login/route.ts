@@ -28,9 +28,10 @@ export async function GET() {
   const response = NextResponse.redirect(spotifyAuthUrl)
   response.cookies.set('spotify_auth_state', state, {
     httpOnly: true,
-    secure: process.env.NODE_ENV === 'production',
-    sameSite: 'lax',
+    secure: true,
+    sameSite: 'none',
     maxAge: 60 * 10, // 10 minutes
+    path: '/',
   })
 
   return response
