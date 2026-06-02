@@ -13,7 +13,7 @@ export async function GET() {
   }
 
   const state = crypto.randomBytes(16).toString('hex')
-  const scope = 'playlist-read-private playlist-read-collaborative'
+  const scope = 'playlist-read-private playlist-read-collaborative user-library-read'
 
   const params = new URLSearchParams({
     client_id: clientId,
