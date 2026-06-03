@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { refreshAccessToken } from '../../../lib/spotify'
+import { refreshAccessToken } from '../../../../lib/spotify'
 
 export async function GET(request: NextRequest) {
   let token = request.cookies.get('spotify_access_token')?.value
