@@ -10,12 +10,23 @@ export default function Dashboard() {
   const router = useRouter()
   const [history, setHistory] = useState<GameHistoryEntry[]>([])
   const [mounted, setMounted] = useState(false)
+  const [error, setError] = useState('')
 
   useEffect(() => {
     const raw = localStorage.getItem(HISTORY_KEY)
     if (raw) setHistory(JSON.parse(raw))
     setMounted(true)
   }, [])
+
+  const handleResumeGame = (gameId: string) => {
+    const gameData = localStorage.getItem(`game_${gameId}`)
+    if (!gameData) {
+      setError('No se encontró la partida. Puede haber sido eliminada.')
+      setTimeout(() => setError(''), 3000)
+      return
+    }
+    router.push(`/dashboard/game/${gameId}`)
+  }
 
   if (!mounted) return null
 
@@ -44,6 +55,12 @@ export default function Dashboard() {
             Historial
           </h2>
 
+          {error && (
+            <div className="bg-red-500/10 border border-red-500/20 text-red-400 rounded-xl p-4 mb-4 text-sm">
+              {error}
+            </div>
+          )}
+
           {history.length === 0 ? (
             <div className="text-center py-16 text-[#a3a3a3]">
               <p className="text-4xl mb-3">🎵</p>
@@ -52,26 +69,28 @@ export default function Dashboard() {
           ) : (
             <ul className="space-y-2">
               {[...history].reverse().map(entry => (
-                <li
-                  key={entry.id}
-                  className="bg-[#141414] border border-[#2a2a2a] rounded-2xl p-4 flex items-center justify-between"
-                >
-                  <div>
-                    <p className="font-semibold text-white">{entry.playlistName}</p>
-                    <p className="text-sm text-[#a3a3a3] mt-0.5">
-                      {entry.playerCount} jugadores · {entry.gridSize}×{entry.gridSize} ·{' '}
-                      {new Date(entry.date).toLocaleDateString('es')}
-                    </p>
-                  </div>
-                  <span
-                    className={`text-xs font-semibold px-3 py-1 rounded-full ${
-                      entry.status === 'finished'
-                        ? 'bg-[#1DB954]/15 text-[#1DB954]'
-                        : 'bg-white/5 text-[#a3a3a3]'
-                    }`}
+                <li key={entry.id}>
+                  <button
+                    onClick={() => handleResumeGame(entry.id)}
+                    className="group w-full bg-[#141414] hover:bg-[#1e1e1e] border border-[#2a2a2a] hover:border-[#1DB954]/40 rounded-2xl p-4 flex items-center justify-between transition-all duration-150 text-left"
                   >
-                    {entry.status === 'finished' ? 'Finalizada' : 'Abandonada'}
-                  </span>
+                    <div>
+                      <p className="font-semibold text-white group-hover:text-[#1DB954]">{entry.playlistName}</p>
+                      <p className="text-sm text-[#a3a3a3] mt-0.5">
+                        {entry.playerCount} jugadores · {entry.gridSize}×{entry.gridSize} ·{' '}
+                        {new Date(entry.date).toLocaleDateString('es')}
+                      </p>
+                    </div>
+                    <span
+                      className={`text-xs font-semibold px-3 py-1 rounded-full ${
+                        entry.status === 'finished'
+                          ? 'bg-[#1DB954]/15 text-[#1DB954]'
+                          : 'bg-white/5 text-[#a3a3a3]'
+                      }`}
+                    >
+                      {entry.status === 'finished' ? 'Finalizada' : 'Abandonada'}
+                    </span>
+                  </button>
                 </li>
               ))}
             </ul>

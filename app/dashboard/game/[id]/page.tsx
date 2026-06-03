@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import type { GameState, GameHistoryEntry } from '../../../../types/bingo'
+import { ReconnectModal } from '../../../../components/ReconnectModal'
 
 const HISTORY_KEY = 'bingo_history'
 
@@ -26,6 +27,7 @@ export default function GamePage() {
   const [playerReady, setPlayerReady] = useState(false)
   const [deviceError, setDeviceError] = useState('')
   const [songSearch, setSongSearch] = useState('')
+  const [showReconnectModal, setShowReconnectModal] = useState(false)
   const deviceIdRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -105,6 +107,10 @@ export default function GamePage() {
 
       try {
         const tokenRes = await fetch('/api/auth/token')
+        if (tokenRes.status === 401) {
+          setShowReconnectModal(true)
+          return
+        }
         if (!tokenRes.ok) return
         const { token } = await tokenRes.json()
 
@@ -116,6 +122,11 @@ export default function GamePage() {
             body: JSON.stringify({ uris: [`spotify:track:${currentTrack.id}`] }),
           }
         )
+
+        if (res.status === 401) {
+          setShowReconnectModal(true)
+          return
+        }
 
         if (!res.ok) {
           const body = await res.json().catch(() => ({}))
@@ -365,6 +376,11 @@ export default function GamePage() {
           </div>
         )}
       </div>
+
+      <ReconnectModal
+        isOpen={showReconnectModal}
+        onClose={() => setShowReconnectModal(false)}
+      />
     </main>
   )
 }

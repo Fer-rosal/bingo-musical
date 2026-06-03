@@ -76,7 +76,16 @@ export async function GET(request: NextRequest) {
       `${origin}/dashboard`
     )
 
+    const expiresAt = Date.now() + expires_in * 1000
+
     response.cookies.set('spotify_access_token', access_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: expires_in,
+    })
+
+    response.cookies.set('spotify_token_expires_at', expiresAt.toString(), {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',

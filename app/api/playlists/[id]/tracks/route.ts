@@ -27,7 +27,14 @@ export async function GET(
         const refreshed = await refreshAccessToken(refreshToken)
         if (refreshed) {
           const response = NextResponse.json({ tracks: await getPlaylistTracks(refreshed.accessToken, id) })
+          const expiresAt = Date.now() + refreshed.expiresIn * 1000
           response.cookies.set('spotify_access_token', refreshed.accessToken, {
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+            sameSite: 'lax',
+            maxAge: refreshed.expiresIn,
+          })
+          response.cookies.set('spotify_token_expires_at', expiresAt.toString(), {
             httpOnly: true,
             secure: process.env.NODE_ENV === 'production',
             sameSite: 'lax',
