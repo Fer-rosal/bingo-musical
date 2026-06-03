@@ -25,6 +25,7 @@ export default function GamePage() {
   const [player, setPlayer] = useState<any>(null)
   const [playerReady, setPlayerReady] = useState(false)
   const [deviceError, setDeviceError] = useState('')
+  const [songSearch, setSongSearch] = useState('')
   const deviceIdRef = useRef<string | null>(null)
 
   useEffect(() => {
@@ -184,6 +185,19 @@ export default function GamePage() {
   const hasMoreSongs = game.drawnIds.length < game.shuffledQueue.length
   const progress = game.drawnIds.length / game.shuffledQueue.length
 
+  const reversedDrawnIds = [...game.drawnIds].reverse()
+  const filteredDrawnIds = songSearch.trim()
+    ? reversedDrawnIds.filter(id => {
+        const track = game.tracks.find(t => t.id === id)
+        const q = songSearch.toLowerCase()
+        return (
+          track?.name.toLowerCase().includes(q) ||
+          track?.artists.some(a => a.name.toLowerCase().includes(q))
+        )
+      })
+    : reversedDrawnIds
+  const currentTrackId = game.drawnIds[game.drawnIds.length - 1]
+
   return (
     <main className="min-h-screen bg-[#0a0a0a] px-4 py-6">
       <div className="max-w-lg mx-auto">
@@ -314,26 +328,39 @@ export default function GamePage() {
         {/* Played songs */}
         {game.drawnIds.length > 0 && (
           <div className="bg-[#141414] border border-[#2a2a2a] rounded-2xl p-4">
-            <p className="text-xs font-semibold text-[#a3a3a3] uppercase tracking-widest mb-3">
-              Canciones jugadas ({game.drawnIds.length})
-            </p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs font-semibold text-[#a3a3a3] uppercase tracking-widest">
+                Canciones jugadas ({game.drawnIds.length})
+              </p>
+              <input
+                type="text"
+                placeholder="Buscar..."
+                value={songSearch}
+                onChange={(e) => setSongSearch(e.target.value)}
+                className="bg-[#1a1a1a] border border-[#2a2a2a] rounded-lg px-2 py-1 text-xs text-[#a3a3a3] placeholder-[#555] focus:outline-none focus:border-[#1DB954] w-24"
+              />
+            </div>
             <ul className="space-y-2 max-h-52 overflow-y-auto">
-              {[...game.drawnIds].reverse().map((trackId, idx) => {
-                const track = game.tracks.find(t => t.id === trackId)
-                const isCurrent = idx === 0
-                return (
-                  <li key={idx} className={`text-sm flex items-baseline gap-2 ${isCurrent ? 'text-white' : 'text-[#a3a3a3]'}`}>
-                    {isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-[#1DB954] shrink-0 mt-1.5" />}
-                    {!isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-[#2a2a2a] shrink-0 mt-1.5" />}
-                    <span className={isCurrent ? 'font-semibold' : ''}>
-                      {track?.name}
-                      {track?.artists.length ? (
-                        <span className="font-normal text-[#a3a3a3]"> — {track.artists[0].name}</span>
-                      ) : null}
-                    </span>
-                  </li>
-                )
-              })}
+              {filteredDrawnIds.length > 0 ? (
+                filteredDrawnIds.map((trackId) => {
+                  const track = game.tracks.find(t => t.id === trackId)
+                  const isCurrent = trackId === currentTrackId
+                  return (
+                    <li key={trackId} className={`text-sm flex items-baseline gap-2 ${isCurrent ? 'text-white' : 'text-[#a3a3a3]'}`}>
+                      {isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-[#1DB954] shrink-0 mt-1.5" />}
+                      {!isCurrent && <span className="w-1.5 h-1.5 rounded-full bg-[#2a2a2a] shrink-0 mt-1.5" />}
+                      <span className={isCurrent ? 'font-semibold' : ''}>
+                        {track?.name}
+                        {track?.artists.length ? (
+                          <span className="font-normal text-[#a3a3a3]"> — {track.artists[0].name}</span>
+                        ) : null}
+                      </span>
+                    </li>
+                  )
+                })
+              ) : (
+                <li className="text-sm text-[#555] italic">No encontrado</li>
+              )}
             </ul>
           </div>
         )}
