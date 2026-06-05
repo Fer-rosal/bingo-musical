@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import QRCode from 'qrcode.react';
+import { QRCodeSVG } from 'qrcode.react';
 import Link from 'next/link';
 import type { SpotifyPlaylist } from '@/types/bingo';
 
@@ -238,7 +238,7 @@ export default function CreateOnlineGamePage() {
             <h1 className="text-4xl font-bold text-white mb-6">¡Juego creado!</h1>
 
             <div className="bg-white p-6 rounded-lg inline-block mb-8">
-              <QRCode value={`${process.env.NEXT_PUBLIC_APP_URL}/join?code=${createdGame.gameCode}`} size={256} />
+              <QRCodeSVG value={`${process.env.NEXT_PUBLIC_APP_URL}/join?code=${createdGame.gameCode}`} size={256} />
             </div>
 
             <div className="bg-[#282828] border border-[#404040] rounded-lg p-6 mb-8 max-w-md mx-auto">
