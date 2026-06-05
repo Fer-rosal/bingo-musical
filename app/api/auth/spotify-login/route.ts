@@ -38,6 +38,13 @@ export async function POST(request: NextRequest) {
     const host = request.headers.get('host') || request.nextUrl.host;
     const redirectUri = `${protocol}://${host}/api/auth/callback`;
 
+    console.log('Spotify OAuth - Constructed redirect URI:', {
+      protocol,
+      host,
+      redirectUri,
+      clientId: clientId ? '***' : 'missing',
+    });
+
     if (!clientId) {
       console.error('Missing Spotify Client ID');
       return NextResponse.json(
