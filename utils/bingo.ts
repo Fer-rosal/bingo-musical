@@ -1,29 +1,51 @@
 import type { SpotifyTrack, BingoCard, GameConfig } from '../types/bingo'
 
-export function shuffle<T>(arr: T[]): T[] {
+// Seeded random number generator (for deterministic cartón generation)
+class SeededRNG {
+  private seed: number;
+
+  constructor(seed: string) {
+    let hash = 0;
+    for (let i = 0; i < seed.length; i++) {
+      const char = seed.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    this.seed = Math.abs(hash);
+  }
+
+  next(): number {
+    this.seed = (this.seed * 9301 + 49297) % 233280;
+    return this.seed / 233280;
+  }
+}
+
+export function shuffle<T>(arr: T[], seed?: string): T[] {
   const a = [...arr]
+  const rng = seed ? new SeededRNG(seed) : null;
+
   for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1))
+    const j = Math.floor((rng ? rng.next() : Math.random()) * (i + 1))
     ;[a[i], a[j]] = [a[j], a[i]]
   }
   return a
 }
 
-export function getPreMarkedIndices(gridSize: 4 | 5, count: number): number[] {
+export function getPreMarkedIndices(gridSize: 4 | 5, count: number, seed?: string): number[] {
   const total = gridSize * gridSize
   const center = Math.floor(total / 2)
   if (count <= 1) return [center]
   const pool = Array.from({ length: total }, (_, i) => i).filter(i => i !== center)
-  const extras = shuffle(pool).slice(0, count - 1)
+  const extras = shuffle(pool, seed ? `${seed}_premarked` : undefined).slice(0, count - 1)
   return [center, ...extras]
 }
 
-export function generateCard(cardId: number, tracks: SpotifyTrack[], config: GameConfig): BingoCard {
+export function generateCard(cardId: number, tracks: SpotifyTrack[], config: GameConfig, seed?: string): BingoCard {
   const { gridSize, preMarkedCount } = config
   const size = gridSize * gridSize
-  const freeIndices = new Set(getPreMarkedIndices(gridSize, preMarkedCount))
+  const freeIndices = new Set(getPreMarkedIndices(gridSize, preMarkedCount, seed))
   const slotCount = size - freeIndices.size
-  const pool = shuffle(tracks).slice(0, slotCount)
+  const pool = shuffle(tracks, seed ? `${seed}_tracks` : undefined).slice(0, slotCount)
 
   let trackIdx = 0
   const flat: (SpotifyTrack | null)[] = Array.from({ length: size }, (_, i) =>
@@ -38,10 +60,16 @@ export function generateCard(cardId: number, tracks: SpotifyTrack[], config: Gam
   return { id: cardId, grid }
 }
 
-export function generateAllCards(tracks: SpotifyTrack[], config: GameConfig): BingoCard[] {
+export function generateAllCards(tracks: SpotifyTrack[], config: GameConfig, seed?: string): BingoCard[] {
   return Array.from({ length: config.playerCount }, (_, i) =>
-    generateCard(i + 1, tracks, config)
+    generateCard(i + 1, tracks, config, seed ? `${seed}_player${i}` : undefined)
   )
+}
+
+export function generateOnlineCard(playerIndex: number, tracks: SpotifyTrack[], gridSize: 4 | 5, preMarkedCount: number, gameId: string): BingoCard {
+  const seed = `${gameId}_player${playerIndex}`;
+  const config = { gridSize, preMarkedCount, playerCount: 1, playlistName: '' };
+  return generateCard(playerIndex, tracks, config, seed);
 }
 
 // pt to mm: 1pt = 0.352778mm; line height ~1.25x
