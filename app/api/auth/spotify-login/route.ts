@@ -31,7 +31,15 @@ export async function POST(request: NextRequest) {
 
     // Spotify OAuth params
     const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID;
-    const redirectUri = process.env.NEXT_PUBLIC_SPOTIFY_REDIRECT_URI;
+
+    // Construct redirect URI dynamically based on deployment environment
+    let redirectUri = process.env.NEXT_PUBLIC_SPOTIFY_REDIRECT_URI;
+    if (!redirectUri) {
+      // For Vercel deployments (preview and production)
+      const protocol = request.headers.get('x-forwarded-proto') || 'https';
+      const host = request.headers.get('host') || request.nextUrl.host;
+      redirectUri = `${protocol}://${host}/api/auth/callback`;
+    }
 
     if (!clientId || !redirectUri) {
       console.error('Missing Spotify configuration');
