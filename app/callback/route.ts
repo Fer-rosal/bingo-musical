@@ -65,9 +65,19 @@ export async function GET(request: NextRequest) {
 
     if (!tokenResponse.ok) {
       const error = await tokenResponse.json()
-      console.error('Spotify token exchange failed:', error)
+      console.error('Spotify token exchange failed:', {
+        status: tokenResponse.status,
+        statusText: tokenResponse.statusText,
+        error,
+        clientId: clientId ? '***' : 'missing',
+        clientSecret: clientSecret ? '***' : 'missing',
+        redirectUri,
+      })
       return NextResponse.json(
-        { error: 'Failed to exchange authorization code' },
+        {
+          error: 'Failed to exchange authorization code',
+          details: JSON.stringify(error)
+        },
         { status: 400 }
       )
     }
