@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createHash, randomBytes } from 'crypto';
 
 /**
  * Spotify OAuth Login Endpoint
@@ -11,13 +12,25 @@ import { NextRequest, NextResponse } from 'next/server';
  *
  * No user data is stored. Tokens are only used for session.
  */
+
+// Helper to base64url encode (no padding, - and _ instead of + and /)
+function base64url(buf: Buffer): string {
+  return buf
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=/g, '');
+}
+
 export async function POST(request: NextRequest) {
   try {
     await request.json();
 
-    // Generate state and code verifier for PKCE (security)
-    const state = Buffer.from(Math.random().toString()).toString('base64');
-    const codeVerifier = Buffer.from(Math.random().toString()).toString('base64');
+    // Generate state for CSRF protection
+    const state = base64url(randomBytes(32));
+
+    // Generate PKCE code_verifier (43-128 unreserved characters)
+    const codeVerifier = base64url(randomBytes(32));
 
     // Spotify OAuth params
     const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID;
@@ -44,13 +57,18 @@ export async function POST(request: NextRequest) {
       'playlist-read-collaborative',
     ].join(' ');
 
+    // Generate code_challenge from code_verifier using SHA256
+    const codeChallenge = base64url(
+      createHash('sha256').update(codeVerifier).digest()
+    );
+
     const params = new URLSearchParams({
       client_id: clientId,
       response_type: 'code',
       redirect_uri: redirectUri,
       scope: scopes,
       state,
-      code_challenge: Buffer.from(codeVerifier).toString('base64'),
+      code_challenge: codeChallenge,
       code_challenge_method: 'S256',
       // Show explicit consent screen (don't use cached consent)
       show_dialog: 'true',
