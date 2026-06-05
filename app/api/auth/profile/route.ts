@@ -27,8 +27,9 @@ export async function GET() {
     });
   } catch (error) {
     console.error('Error fetching profile:', error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return NextResponse.json(
-      { error: 'Failed to fetch profile' },
+      { error: 'Failed to fetch profile', details: errorMessage },
       { status: 500 }
     );
   }
