@@ -1,7 +1,6 @@
 'use client';
 
 import { useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ConsentModal, { ConsentData } from '@/components/Auth/ConsentModal';
 
@@ -16,7 +15,6 @@ import ConsentModal, { ConsentData } from '@/components/Auth/ConsentModal';
  * 5. Redirected to Spotify OAuth
  */
 export default function LoginPage() {
-  const router = useRouter();
   const [showConsent, setShowConsent] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');

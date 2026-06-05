@@ -1,7 +1,5 @@
 import { auth, db } from '@/lib/firebase';
 import {
-  signInWithPopup,
-  GoogleAuthProvider,
   signOut as firebaseSignOut,
   onAuthStateChanged,
   User,

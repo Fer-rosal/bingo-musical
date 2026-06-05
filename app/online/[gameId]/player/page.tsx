@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import type { SpotifyTrack, BingoCard } from '@/types/bingo';
 import { generateOnlineCard } from '@/utils/bingo';
@@ -18,7 +18,6 @@ interface PlayerGameData {
 }
 
 export default function PlayerGamePage() {
-  const router = useRouter();
   const params = useParams();
   const gameId = params.gameId as string;
 
@@ -29,7 +28,7 @@ export default function PlayerGamePage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
-  const { gameState, loading: gameLoading } = useGameState(gameId);
+  const { gameState } = useGameState(gameId);
 
   useEffect(() => {
     const stored = localStorage.getItem(`online_game_${gameId}`);

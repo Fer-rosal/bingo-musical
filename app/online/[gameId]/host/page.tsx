@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import type { SpotifyTrack } from '@/types/bingo';
 import { useGameState } from '@/lib/hooks/useGameState';
@@ -18,7 +18,6 @@ interface GameData {
 }
 
 export default function HostGamePage() {
-  const router = useRouter();
   const params = useParams();
   const gameId = params.gameId as string;
 
@@ -28,7 +27,7 @@ export default function HostGamePage() {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
 
-  const { gameState, loading: gameLoading } = useGameState(gameId, 1000);
+  const { gameState } = useGameState(gameId, 1000);
 
   useEffect(() => {
     const fetchGame = async () => {

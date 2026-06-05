@@ -7,9 +7,6 @@ import {
   updateDoc,
   query,
   where,
-  Timestamp,
-  DocumentData,
-  QueryConstraint,
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { GameSession, GamePlayer, OnlineGameConfig } from '@/types/online';

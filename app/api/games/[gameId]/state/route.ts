@@ -1,8 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 import { getGameSessionById } from '@/lib/db/gameSession';
 
 export async function GET(
-  request: NextRequest,
+  _: unknown,
   { params }: { params: { gameId: string } }
 ) {
   try {

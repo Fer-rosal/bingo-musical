@@ -68,7 +68,7 @@ export function generateAllCards(tracks: SpotifyTrack[], config: GameConfig, see
 
 export function generateOnlineCard(playerIndex: number, tracks: SpotifyTrack[], gridSize: 4 | 5, preMarkedCount: number, gameId: string): BingoCard {
   const seed = `${gameId}_player${playerIndex}`;
-  const config = { gridSize, preMarkedCount, playerCount: 1, playlistName: '' };
+  const config = { playlistId: '', gridSize, preMarkedCount, playerCount: 1, playlistName: '' };
   return generateCard(playerIndex, tracks, config, seed);
 }
 
