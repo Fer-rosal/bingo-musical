@@ -34,21 +34,22 @@ export async function GET(request: NextRequest) {
 
   const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID
   const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
+  const codeVerifier = request.cookies.get('spotify_code_verifier')?.value
 
   // Construct redirect URI dynamically
   const protocol = request.headers.get('x-forwarded-proto') || 'https'
   const host = request.headers.get('host') || request.nextUrl.host
   const redirectUri = `${protocol}://${host}/callback`
 
-  if (!clientId || !clientSecret || !redirectUri) {
+  if (!clientId || !clientSecret || !redirectUri || !codeVerifier) {
     return NextResponse.json(
-      { error: 'Missing Spotify configuration' },
+      { error: 'Missing Spotify configuration or PKCE verifier' },
       { status: 500 }
     )
   }
 
   try {
-    // Exchange authorization code for access token
+    // Exchange authorization code for access token with PKCE
     const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
       method: 'POST',
       headers: {
@@ -60,6 +61,7 @@ export async function GET(request: NextRequest) {
         redirect_uri: redirectUri,
         client_id: clientId,
         client_secret: clientSecret,
+        code_verifier: codeVerifier,
       }).toString(),
     })
 
@@ -115,8 +117,9 @@ export async function GET(request: NextRequest) {
       })
     }
 
-    // Clear state cookie
+    // Clear temporary cookies
     response.cookies.delete('spotify_auth_state')
+    response.cookies.delete('spotify_code_verifier')
 
     return response
   } catch (error) {
