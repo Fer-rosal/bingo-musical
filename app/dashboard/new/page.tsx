@@ -25,7 +25,7 @@ export default function NewGamePage() {
     const fetchPlaylists = async () => {
       try {
         const res = await fetch('/api/playlists')
-        if (res.status === 401) { router.push('/api/auth/login'); return }
+        if (res.status === 401) { router.push('/login'); return }
         if (!res.ok) throw new Error()
         const { playlists } = await res.json()
         setPlaylists(playlists)

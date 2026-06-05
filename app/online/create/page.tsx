@@ -31,7 +31,7 @@ export default function CreateOnlineGamePage() {
       try {
         const res = await fetch('/api/playlists');
         if (res.status === 401) {
-          router.push('/api/auth/login');
+          router.push('/login');
           return;
         }
         if (!res.ok) throw new Error();
