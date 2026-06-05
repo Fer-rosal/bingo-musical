@@ -2,28 +2,18 @@ import { NextRequest, NextResponse } from 'next/server';
 
 /**
  * Spotify OAuth Login Endpoint
- * Initiates Spotify OAuth flow with proper consent validation
+ * Initiates Spotify OAuth flow for stateless authentication
  *
  * Security measures:
  * - PKCE flow for security (code challenge)
  * - State parameter to prevent CSRF
- * - Requires RGPD consent before auth
  * - Secure cookie storage of tokens
+ *
+ * No user data is stored. Tokens are only used for session.
  */
 export async function POST(request: NextRequest) {
   try {
-    const { consent } = await request.json();
-
-    // Validate consent (required by RGPD)
-    if (!consent?.rgpdAgreed || !consent?.privacyAgreed || !consent?.termsAgreed) {
-      return NextResponse.json(
-        {
-          error: 'Debes aceptar la Política de Privacidad, Términos y RGPD para continuar',
-          code: 'CONSENT_REQUIRED',
-        },
-        { status: 400 }
-      );
-    }
+    await request.json();
 
     // Generate state and code verifier for PKCE (security)
     const state = Buffer.from(Math.random().toString()).toString('base64');
@@ -38,12 +28,6 @@ export async function POST(request: NextRequest) {
     const host = request.headers.get('host') || request.nextUrl.host;
     const redirectUri = `${protocol}://${host}/api/auth/callback`;
 
-    console.log('Spotify OAuth - Constructed redirect URI:', {
-      protocol,
-      host,
-      redirectUri,
-      clientId: clientId ? '***' : 'missing',
-    });
 
     if (!clientId) {
       console.error('Missing Spotify Client ID');
@@ -95,14 +79,6 @@ export async function POST(request: NextRequest) {
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 600,
-      path: '/',
-    });
-
-    // Store consent preferences
-    response.cookies.set('user_consent', JSON.stringify(consent), {
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'strict',
-      maxAge: 31536000, // 1 year
       path: '/',
     });
 
