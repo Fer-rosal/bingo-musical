@@ -42,13 +42,22 @@ export default function Dashboard() {
           <h1 className="text-2xl font-bold text-white tracking-tight">Bingo Musical</h1>
         </div>
 
-        <button
-          onClick={() => router.push('/dashboard/new')}
-          className="w-full py-4 bg-[#1DB954] hover:bg-[#1aa34a] text-black font-bold text-base rounded-2xl transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] mb-10 flex items-center justify-center gap-2"
-        >
-          <span className="text-xl leading-none">+</span>
-          Nueva Partida
-        </button>
+        <div className="grid grid-cols-2 gap-3 mb-10">
+          <button
+            onClick={() => router.push('/dashboard/new')}
+            className="py-4 bg-[#1DB954] hover:bg-[#1aa34a] text-black font-bold text-base rounded-2xl transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2"
+          >
+            <span className="text-xl leading-none">+</span>
+            Offline
+          </button>
+          <button
+            onClick={() => router.push('/online/create')}
+            className="py-4 bg-white hover:bg-gray-100 text-black font-bold text-base rounded-2xl transition-all duration-200 hover:scale-[1.01] active:scale-[0.99] flex items-center justify-center gap-2"
+          >
+            <span className="text-xl leading-none">+</span>
+            Online
+          </button>
+        </div>
 
         <div>
           <h2 className="text-xs font-semibold text-[#a3a3a3] uppercase tracking-widest mb-4">
