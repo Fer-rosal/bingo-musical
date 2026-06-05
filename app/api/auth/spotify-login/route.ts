@@ -55,6 +55,7 @@ export async function POST(request: NextRequest) {
       'user-read-email',
       'playlist-read-private',
       'playlist-read-collaborative',
+      'streaming',
     ].join(' ');
 
     // Generate code_challenge from code_verifier using SHA256
