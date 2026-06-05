@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     // This ensures it works with localhost, preview URLs, and production
     const protocol = request.headers.get('x-forwarded-proto') || 'https';
     const host = request.headers.get('host') || request.nextUrl.host;
-    const redirectUri = `${protocol}://${host}/api/auth/callback`;
+    const redirectUri = `${protocol}://${host}/callback`;
 
 
     if (!clientId) {
