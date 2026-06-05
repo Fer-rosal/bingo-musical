@@ -7,11 +7,11 @@ import { generateAllCards, generatePDF, shuffle } from '../../../utils/bingo'
 
 const HISTORY_KEY = 'bingo_history'
 
-type Step = 'checking-auth' | 'loading' | 'pick-playlist' | 'config' | 'generating'
+type Step = 'loading' | 'pick-playlist' | 'config' | 'generating'
 
 export default function NewGamePage() {
   const router = useRouter()
-  const [step, setStep] = useState<Step>('checking-auth')
+  const [step, setStep] = useState<Step>('loading')
   const [playlists, setPlaylists] = useState<SpotifyPlaylist[]>([])
   const [selectedPlaylist, setSelectedPlaylist] = useState<SpotifyPlaylist | null>(null)
   const [playerCount, setPlayerCount] = useState(4)
@@ -24,15 +24,10 @@ export default function NewGamePage() {
   useEffect(() => {
     const fetchPlaylists = async () => {
       try {
-        // First check if authenticated
-        const authRes = await fetch('/api/playlists')
-        if (authRes.status === 401) {
-          setStep('checking-auth')
-          return
-        }
-
-        if (!authRes.ok) throw new Error()
-        const { playlists } = await authRes.json()
+        const res = await fetch('/api/playlists')
+        if (res.status === 401) { router.push('/api/auth/login'); return }
+        if (!res.ok) throw new Error()
+        const { playlists } = await res.json()
         setPlaylists(playlists)
         setStep('pick-playlist')
       } catch {
@@ -40,13 +35,7 @@ export default function NewGamePage() {
         setStep('pick-playlist')
       }
     }
-
-    // Start by checking auth
-    const checkAuth = async () => {
-      await fetchPlaylists()
-    }
-
-    checkAuth()
+    fetchPlaylists()
   }, [router])
 
   const handleSelectPlaylist = (playlist: SpotifyPlaylist) => {
@@ -62,7 +51,7 @@ export default function NewGamePage() {
 
     try {
       const res = await fetch(`/api/playlists/${selectedPlaylist.id}/tracks`)
-      if (res.status === 401) { router.push('/login'); return }
+      if (res.status === 401) { router.push('/api/auth/login'); return }
       if (!res.ok) {
         const { error } = await res.json()
         throw new Error(error || 'Error al obtener canciones')
@@ -110,40 +99,6 @@ export default function NewGamePage() {
       setError('Error al crear la partida')
       setStep('config')
     }
-  }
-
-  if (step === 'checking-auth') {
-    return (
-      <main className="min-h-screen bg-[#0a0a0a] flex items-center justify-center px-6">
-        <div className="text-center max-w-md w-full">
-          <div className="w-20 h-20 rounded-full bg-[#1DB954] flex items-center justify-center mx-auto mb-8">
-            <svg viewBox="0 0 24 24" className="w-10 h-10 fill-black">
-              <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
-            </svg>
-          </div>
-
-          <h1 className="text-3xl font-bold text-white mb-2">Modo Offline</h1>
-          <p className="text-[#a3a3a3] mb-8">Necesitas conectarte con Spotify para acceder a tus playlists</p>
-
-          <button
-            onClick={() => router.push('/login')}
-            className="w-full bg-[#1DB954] hover:bg-[#1aa34a] text-black font-bold py-3 rounded-lg transition-all mb-4 flex items-center justify-center gap-3"
-          >
-            <svg viewBox="0 0 24 24" className="w-5 h-5 fill-black">
-              <path d="M12 0C5.4 0 0 5.4 0 12s5.4 12 12 12 12-5.4 12-12S18.66 0 12 0zm5.521 17.34c-.24.359-.66.48-1.021.24-2.82-1.74-6.36-2.101-10.561-1.141-.418.122-.779-.179-.899-.539-.12-.421.18-.78.54-.9 4.56-1.021 8.52-.6 11.64 1.32.42.18.479.659.301 1.02zm1.44-3.3c-.301.42-.841.6-1.262.3-3.239-1.98-8.159-2.58-11.939-1.38-.479.12-1.02-.12-1.14-.6-.12-.48.12-1.021.6-1.141C9.6 9.9 15 10.561 18.72 12.84c.361.181.54.78.241 1.2zm.12-3.36C15.24 8.4 8.82 8.16 5.16 9.301c-.6.179-1.2-.181-1.38-.721-.18-.601.18-1.2.72-1.381 4.26-1.26 11.28-1.02 15.721 1.621.539.3.719 1.02.419 1.56-.299.421-1.02.599-1.559.3z" />
-            </svg>
-            Conectar con Spotify
-          </button>
-
-          <button
-            onClick={() => router.back()}
-            className="w-full text-[#a3a3a3] hover:text-white py-2 transition"
-          >
-            ← Volver
-          </button>
-        </div>
-      </main>
-    )
   }
 
   if (step === 'loading') {
