@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import type { SpotifyTrack } from '@/types/bingo';
 import { useGameState } from '@/lib/hooks/useGameState';
+import { useSpotifyPlayback } from '@/lib/hooks/useSpotifyPlayback';
 
 interface GameData {
   id: string;
@@ -26,8 +27,14 @@ export default function HostGamePage() {
   const [selectedSongIdx, setSelectedSongIdx] = useState(0);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [nativeConnectionNotified, setNativeConnectionNotified] = useState(false);
 
   const { gameState } = useGameState(gameId, 1000);
+  const playback = useSpotifyPlayback({
+    onFallbackToWeb: () => {
+      setError('Conexión con Spotify nativa perdida. Usando reproductor web.');
+    },
+  });
 
   useEffect(() => {
     const fetchGame = async () => {
@@ -58,10 +65,23 @@ export default function HostGamePage() {
     if (!tracks[selectedSongIdx]) return;
 
     try {
+      const track = tracks[selectedSongIdx];
+
+      // Attempt to play via native Spotify if connected, otherwise web player will handle it
+      if (playback.useNativePlayback && playback.isConnected) {
+        try {
+          await playback.play(track.id);
+        } catch (playbackErr) {
+          console.warn('Native playback failed, fallback to web:', playbackErr);
+          // Web player fallback will be handled by the service
+        }
+      }
+
+      // Send song reveal to backend regardless of playback method
       const response = await fetch(`/api/games/${gameId}/draw-song`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ songId: tracks[selectedSongIdx].id }),
+        body: JSON.stringify({ songId: track.id }),
       });
 
       if (response.ok) {
@@ -91,10 +111,17 @@ export default function HostGamePage() {
     }
   };
 
+  // Show native connection status banner if using native playback
+  useEffect(() => {
+    if (playback.useNativePlayback && playback.isConnected && !nativeConnectionNotified) {
+      setNativeConnectionNotified(true);
+    }
+  }, [playback.useNativePlayback, playback.isConnected, nativeConnectionNotified]);
+
   if (loading) {
     return (
       <main className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
-        <p className="text-[#a3a3a3]">Cargando...</p>
+        <p className="text-[#a3a3a3]" data-testid="host-page-loading">Cargando...</p>
       </main>
     );
   }
@@ -129,6 +156,15 @@ export default function HostGamePage() {
           </div>
         </div>
 
+        {nativeConnectionNotified && playback.useNativePlayback && playback.isConnected && (
+          <div
+            className="bg-green-900 bg-opacity-30 border border-green-500 text-green-200 px-4 py-3 rounded-lg mb-6"
+            data-testid="host-native-spotify-indicator"
+          >
+            ✓ Conectado a Spotify nativo
+          </div>
+        )}
+
         {error && (
           <div className="bg-red-900 bg-opacity-30 border border-red-500 text-red-200 px-4 py-3 rounded-lg mb-6">
             {error}
@@ -159,9 +195,11 @@ export default function HostGamePage() {
                 <div className="flex gap-3">
                   <button
                     onClick={handleRevealSong}
-                    disabled={gameState?.status === 'finished'}
-                    className="flex-1 py-3 bg-[#1DB954] hover:bg-[#1aa34a] disabled:bg-[#404040] text-black font-bold rounded-lg transition-all"
+                    disabled={gameState?.status === 'finished' || playback.isLoading}
+                    data-testid="host-reveal-song-btn"
+                    className="flex-1 py-3 bg-[#1DB954] hover:bg-[#1aa34a] disabled:bg-[#404040] text-black font-bold rounded-lg transition-all flex items-center justify-center gap-2"
                   >
+                    {playback.isLoading && <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />}
                     Revelar siguiente
                   </button>
                 </div>
