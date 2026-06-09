@@ -142,7 +142,7 @@ export default function SpotifyConnect({
         onClick={handleConnect}
         disabled={isDisabled}
         data-testid="spotify-connect-btn"
-        className="w-full bg-[#1DB954] hover:bg-[#1aa34a] disabled:bg-[#404040] text-black font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-3"
+        className="w-full bg-[#1DB954] hover:bg-[#1aa34a] disabled:bg-[#404040] text-black font-bold py-3 rounded-lg transition-all flex items-center justify-center gap-3 focus:outline-none focus:ring-2 focus:ring-[#1DB954] focus:ring-offset-2 focus:ring-offset-[#0a0a0a]"
       >
         {isConnecting && <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />}
         <svg viewBox="0 0 24 24" className="w-5 h-5 fill-current">
@@ -165,7 +165,7 @@ export default function SpotifyConnect({
           onClick={handleConnect}
           disabled={isConnecting}
           data-testid="spotify-connect-retry-btn"
-          className="w-full text-sm bg-[#282828] hover:bg-[#333333] text-[#a3a3a3] py-2 rounded-lg transition-all"
+          className="w-full text-sm bg-[#282828] hover:bg-[#333333] text-[#a3a3a3] py-2 rounded-lg transition-all focus:outline-none focus:ring-2 focus:ring-[#a3a3a3] focus:ring-offset-2 focus:ring-offset-[#0a0a0a]"
         >
           Reintentar
         </button>
