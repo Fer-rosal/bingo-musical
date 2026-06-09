@@ -1,0 +1,190 @@
+#!/bin/bash
+# =============================================================================
+# WebForge Agent CLI
+# Call agents from the project root: ./agent <command> [args]
+#
+# Usage:
+#   ./agent status              # Show all agent status
+#   ./agent start               # Start CTO watchdog loop
+#   ./agent send <agent> <msg>  # Send work to an agent
+#   ./agent logs <agent>        # View agent logs
+#   ./agent reset <agent>       # Clear agent inbox/job
+# =============================================================================
+
+set -uo pipefail
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Resolve paths
+# ─────────────────────────────────────────────────────────────────────────────
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+WEBFORGE_ROOT="$SCRIPT_DIR/.webforge"
+PROJECT_PATH="$SCRIPT_DIR"
+
+if [[ ! -d "$WEBFORGE_ROOT" ]]; then
+  echo "❌ Error: .webforge directory not found at: $WEBFORGE_ROOT"
+  exit 1
+fi
+
+INBOX_PROTOCOL="$WEBFORGE_ROOT/scripts/inbox_protocol.sh"
+if [[ ! -f "$INBOX_PROTOCOL" ]]; then
+  echo "❌ Error: inbox_protocol.sh not found"
+  exit 1
+fi
+
+source "$INBOX_PROTOCOL"
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Commands
+# ─────────────────────────────────────────────────────────────────────────────
+
+cmd_status() {
+  inbox_status
+}
+
+cmd_start() {
+  echo "🚀 Starting CTO watchdog loop..."
+  echo "   Log: $WEBFORGE_ROOT/logs/cto/loop_$(date +%Y-%m-%d).log"
+  echo ""
+  bash "$WEBFORGE_ROOT/scripts/run_cto.sh"
+}
+
+cmd_send() {
+  local agent="$1"
+  local message="$2"
+
+  if [[ -z "$agent" || -z "$message" ]]; then
+    echo "❌ Usage: ./agent send <agent> <message>"
+    echo ""
+    echo "   Agents: po, architect, frontend, backend, qa, ux, cto"
+    exit 1
+  fi
+
+  inbox_send "$agent" "$message"
+  echo "✅ Message sent to $agent"
+  inbox_status
+}
+
+cmd_logs() {
+  local agent="$1"
+
+  if [[ -z "$agent" ]]; then
+    echo "❌ Usage: ./agent logs <agent>"
+    exit 1
+  fi
+
+  local log_dir="$WEBFORGE_ROOT/logs/$agent"
+  if [[ ! -d "$log_dir" ]]; then
+    echo "❌ No logs found for agent: $agent"
+    exit 1
+  fi
+
+  echo "📋 Logs for $agent:"
+  ls -lh "$log_dir" | tail -n +2 | while read -r line; do
+    echo "  $line"
+  done
+
+  echo ""
+  local latest="$(ls -t "$log_dir"/*.md 2>/dev/null | head -1)"
+  if [[ -n "$latest" ]]; then
+    echo "📖 Latest log (tail):"
+    echo ""
+    tail -n 30 "$latest"
+  fi
+}
+
+cmd_reset() {
+  local agent="$1"
+
+  if [[ -z "$agent" ]]; then
+    echo "❌ Usage: ./agent reset <agent>"
+    exit 1
+  fi
+
+  local inbox="$AGENTS_DIR/$agent/inbox.md"
+  local job="$AGENTS_DIR/$agent/actual_job.md"
+
+  if [[ -f "$inbox" ]]; then
+    rm "$inbox"
+    echo "✅ Cleared inbox for $agent"
+  fi
+
+  if [[ -f "$job" ]]; then
+    rm "$job"
+    echo "✅ Cleared job for $agent"
+  fi
+
+  if [[ ! -f "$inbox" && ! -f "$job" ]]; then
+    echo "✅ Agent $agent is now idle"
+  fi
+
+  inbox_status
+}
+
+cmd_help() {
+  cat << 'EOF'
+╔══════════════════════════════════════════════════════════════╗
+║           WebForge Agent CLI                                 ║
+╚══════════════════════════════════════════════════════════════╝
+
+COMMANDS:
+
+  status                    Show all agent states
+  start                     Start the CTO watchdog loop
+  send <agent> <message>    Send work to an agent
+  logs <agent>              View agent's logs
+  reset <agent>             Clear agent inbox/job (restart)
+  help                      Show this message
+
+EXAMPLES:
+
+  ./agent status
+  ./agent start
+  ./agent send po "Please implement user login feature"
+  ./agent logs architect
+  ./agent reset frontend
+
+AGENT NAMES:
+
+  po architect frontend backend qa ux cto
+
+For more info on each agent's role, see:
+  .webforge/agents/<agent>/CLAUDE.md
+
+EOF
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Main entry point
+# ─────────────────────────────────────────────────────────────────────────────
+
+CMD="${1:-help}"
+
+case "$CMD" in
+  status)
+    cmd_status
+    ;;
+  start)
+    cmd_start
+    ;;
+  send)
+    shift
+    cmd_send "$@"
+    ;;
+  logs)
+    shift
+    cmd_logs "$@"
+    ;;
+  reset)
+    shift
+    cmd_reset "$@"
+    ;;
+  help|--help|-h)
+    cmd_help
+    ;;
+  *)
+    echo "❌ Unknown command: $CMD"
+    echo ""
+    cmd_help
+    exit 1
+    ;;
+esac

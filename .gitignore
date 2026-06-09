@@ -29,3 +29,6 @@ Thumbs.db
 
 # Build
 .vercel
+
+# WebForge agent framework
+.webforge/
