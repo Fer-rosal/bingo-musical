@@ -151,7 +151,8 @@ describe('Online Carton Generation', () => {
       const carton = generateOnlineCard(0, smallTracks, 4, 1, 'game_small');
       const flatGrid = carton.grid.flat();
       const songCells = flatGrid.filter(t => t).length;
-      expect(songCells).toBe(15); // 4x4 - 1 free
+      // 4x4 has 15 song slots (1 free), but only 10 tracks available → 10 filled
+      expect(songCells).toBe(10);
     });
   });
 

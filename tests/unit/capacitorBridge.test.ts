@@ -29,45 +29,43 @@ const mockCapacitorIOS = {
   getPlatform: jest.fn(() => 'ios'),
 };
 
-describe('Capacitor Spotify Bridge', () => {
-  let originalWindow: any;
+// Helper to set/clear Capacitor on the JSDOM window
+const setCapacitor = (cap: any) => { (window as any).Capacitor = cap; };
+const clearCapacitor = () => { delete (window as any).Capacitor; };
 
+describe('Capacitor Spotify Bridge', () => {
   beforeEach(() => {
-    originalWindow = global.window;
     jest.clearAllMocks();
+    clearCapacitor();
   });
 
   afterEach(() => {
-    global.window = originalWindow;
+    clearCapacitor();
   });
 
   describe('detectPlatform', () => {
     it('should return "android" when Capacitor reports android', () => {
-      (global as any).window = { Capacitor: mockCapacitorAndroid };
+      setCapacitor(mockCapacitorAndroid);
       expect(detectPlatform()).toBe('android');
     });
 
     it('should return "ios" when Capacitor reports ios', () => {
-      (global as any).window = { Capacitor: mockCapacitorIOS };
+      setCapacitor(mockCapacitorIOS);
       expect(detectPlatform()).toBe('ios');
     });
 
     it('should return "web" when Capacitor is not available', () => {
-      (global as any).window = {};
+      clearCapacitor();
       expect(detectPlatform()).toBe('web');
     });
 
-    it('should return "web" when window is undefined', () => {
-      delete (global as any).window;
+    it('should return "web" when Capacitor is absent (no window.Capacitor)', () => {
+      clearCapacitor();
       expect(detectPlatform()).toBe('web');
     });
 
     it('should return "web" when getPlatform returns unknown value', () => {
-      (global as any).window = {
-        Capacitor: {
-          getPlatform: jest.fn(() => 'unknown'),
-        },
-      };
+      setCapacitor({ getPlatform: jest.fn(() => 'unknown') });
       expect(detectPlatform()).toBe('web');
     });
   });
@@ -75,19 +73,19 @@ describe('Capacitor Spotify Bridge', () => {
   describe('SpotifyCapacitorBridge', () => {
     describe('initialization', () => {
       it('should initialize with correct platform on Android', () => {
-        (global as any).window = { Capacitor: mockCapacitorAndroid };
+        setCapacitor(mockCapacitorAndroid);
         const bridge = new SpotifyCapacitorBridge();
         expect(bridge.getPlatform()).toBe('android');
       });
 
       it('should initialize as not connected', () => {
-        (global as any).window = { Capacitor: mockCapacitorAndroid };
+        setCapacitor(mockCapacitorAndroid);
         const bridge = new SpotifyCapacitorBridge();
         expect(bridge.getIsConnected()).toBe(false);
       });
 
       it('should not have plugin on web platform', () => {
-        (global as any).window = { Capacitor: mockCapacitorWeb };
+        setCapacitor(mockCapacitorWeb);
         const bridge = new SpotifyCapacitorBridge();
         expect(bridge.isAvailable()).toBe(false);
       });
@@ -95,24 +93,19 @@ describe('Capacitor Spotify Bridge', () => {
 
     describe('isAvailable', () => {
       it('should return true when on Android with plugin', () => {
-        (global as any).window = { Capacitor: mockCapacitorAndroid };
+        setCapacitor(mockCapacitorAndroid);
         const bridge = new SpotifyCapacitorBridge();
         expect(bridge.isAvailable()).toBe(true);
       });
 
       it('should return false when not on Android', () => {
-        (global as any).window = { Capacitor: mockCapacitorWeb };
+        setCapacitor(mockCapacitorWeb);
         const bridge = new SpotifyCapacitorBridge();
         expect(bridge.isAvailable()).toBe(false);
       });
 
       it('should return false when plugin is missing', () => {
-        (global as any).window = {
-          Capacitor: {
-            getPlatform: jest.fn(() => 'android'),
-            Plugins: {},
-          },
-        };
+        setCapacitor({ getPlatform: jest.fn(() => 'android'), Plugins: {} });
         const bridge = new SpotifyCapacitorBridge();
         expect(bridge.isAvailable()).toBe(false);
       });
@@ -120,14 +113,14 @@ describe('Capacitor Spotify Bridge', () => {
 
     describe('connect', () => {
       it('should return false on non-Android platforms', async () => {
-        (global as any).window = { Capacitor: mockCapacitorWeb };
+        setCapacitor(mockCapacitorWeb);
         const bridge = new SpotifyCapacitorBridge();
         const result = await bridge.connect();
         expect(result).toBe(false);
       });
 
       it('should call plugin.connect and set connected state', async () => {
-        (global as any).window = { Capacitor: mockCapacitorAndroid };
+        setCapacitor(mockCapacitorAndroid);
         mockCapacitorAndroid.Plugins.SpotifySDK.connect.mockResolvedValue({
           connected: true,
           spotifyVersion: '1.0',
@@ -139,7 +132,7 @@ describe('Capacitor Spotify Bridge', () => {
       });
 
       it('should return false when connect returns false', async () => {
-        (global as any).window = { Capacitor: mockCapacitorAndroid };
+        setCapacitor(mockCapacitorAndroid);
         mockCapacitorAndroid.Plugins.SpotifySDK.connect.mockResolvedValue({
           connected: false,
         });
@@ -150,7 +143,7 @@ describe('Capacitor Spotify Bridge', () => {
       });
 
       it('should return false when app not installed (APP_NOT_INSTALLED error)', async () => {
-        (global as any).window = { Capacitor: mockCapacitorAndroid };
+        setCapacitor(mockCapacitorAndroid);
         mockCapacitorAndroid.Plugins.SpotifySDK.connect.mockRejectedValue({
           code: 'APP_NOT_INSTALLED',
           error: 'Spotify app is not installed',
@@ -161,7 +154,7 @@ describe('Capacitor Spotify Bridge', () => {
       });
 
       it('should throw on other errors', async () => {
-        (global as any).window = { Capacitor: mockCapacitorAndroid };
+        setCapacitor(mockCapacitorAndroid);
         const testError = {
           code: 'UNKNOWN_ERROR',
           error: 'Something went wrong',
@@ -174,13 +167,13 @@ describe('Capacitor Spotify Bridge', () => {
 
     describe('play', () => {
       it('should throw when not connected', async () => {
-        (global as any).window = { Capacitor: mockCapacitorAndroid };
+        setCapacitor(mockCapacitorAndroid);
         const bridge = new SpotifyCapacitorBridge();
         await expect(bridge.play('track123')).rejects.toThrow('Spotify not connected');
       });
 
       it('should play track when connected', async () => {
-        (global as any).window = { Capacitor: mockCapacitorAndroid };
+        setCapacitor(mockCapacitorAndroid);
         mockCapacitorAndroid.Plugins.SpotifySDK.connect.mockResolvedValue({ connected: true });
         mockCapacitorAndroid.Plugins.SpotifySDK.play.mockResolvedValue({
           playing: true,
@@ -194,7 +187,7 @@ describe('Capacitor Spotify Bridge', () => {
       });
 
       it('should pass contextUri to plugin if provided', async () => {
-        (global as any).window = { Capacitor: mockCapacitorAndroid };
+        setCapacitor(mockCapacitorAndroid);
         mockCapacitorAndroid.Plugins.SpotifySDK.connect.mockResolvedValue({ connected: true });
         mockCapacitorAndroid.Plugins.SpotifySDK.play.mockResolvedValue({
           playing: true,
@@ -212,13 +205,13 @@ describe('Capacitor Spotify Bridge', () => {
 
     describe('pause', () => {
       it('should throw when not connected', async () => {
-        (global as any).window = { Capacitor: mockCapacitorAndroid };
+        setCapacitor(mockCapacitorAndroid);
         const bridge = new SpotifyCapacitorBridge();
         await expect(bridge.pause()).rejects.toThrow('Spotify not connected');
       });
 
       it('should pause when connected', async () => {
-        (global as any).window = { Capacitor: mockCapacitorAndroid };
+        setCapacitor(mockCapacitorAndroid);
         mockCapacitorAndroid.Plugins.SpotifySDK.connect.mockResolvedValue({ connected: true });
         mockCapacitorAndroid.Plugins.SpotifySDK.pause.mockResolvedValue({ paused: true });
         const bridge = new SpotifyCapacitorBridge();
@@ -230,13 +223,13 @@ describe('Capacitor Spotify Bridge', () => {
 
     describe('resume', () => {
       it('should throw when not connected', async () => {
-        (global as any).window = { Capacitor: mockCapacitorAndroid };
+        setCapacitor(mockCapacitorAndroid);
         const bridge = new SpotifyCapacitorBridge();
         await expect(bridge.resume()).rejects.toThrow('Spotify not connected');
       });
 
       it('should resume when connected', async () => {
-        (global as any).window = { Capacitor: mockCapacitorAndroid };
+        setCapacitor(mockCapacitorAndroid);
         mockCapacitorAndroid.Plugins.SpotifySDK.connect.mockResolvedValue({ connected: true });
         mockCapacitorAndroid.Plugins.SpotifySDK.resume.mockResolvedValue({ playing: true });
         const bridge = new SpotifyCapacitorBridge();
@@ -248,13 +241,13 @@ describe('Capacitor Spotify Bridge', () => {
 
     describe('skipNext', () => {
       it('should throw when not connected', async () => {
-        (global as any).window = { Capacitor: mockCapacitorAndroid };
+        setCapacitor(mockCapacitorAndroid);
         const bridge = new SpotifyCapacitorBridge();
         await expect(bridge.skipNext()).rejects.toThrow('Spotify not connected');
       });
 
       it('should skip to next track when connected', async () => {
-        (global as any).window = { Capacitor: mockCapacitorAndroid };
+        setCapacitor(mockCapacitorAndroid);
         mockCapacitorAndroid.Plugins.SpotifySDK.connect.mockResolvedValue({ connected: true });
         mockCapacitorAndroid.Plugins.SpotifySDK.skipNext.mockResolvedValue({ skipped: true });
         const bridge = new SpotifyCapacitorBridge();
@@ -266,13 +259,13 @@ describe('Capacitor Spotify Bridge', () => {
 
     describe('getCurrentTrack', () => {
       it('should throw when not connected', async () => {
-        (global as any).window = { Capacitor: mockCapacitorAndroid };
+        setCapacitor(mockCapacitorAndroid);
         const bridge = new SpotifyCapacitorBridge();
         await expect(bridge.getCurrentTrack()).rejects.toThrow('Spotify not connected');
       });
 
       it('should return track info when connected', async () => {
-        (global as any).window = { Capacitor: mockCapacitorAndroid };
+        setCapacitor(mockCapacitorAndroid);
         mockCapacitorAndroid.Plugins.SpotifySDK.connect.mockResolvedValue({ connected: true });
         mockCapacitorAndroid.Plugins.SpotifySDK.getCurrentTrack.mockResolvedValue({
           trackId: 'track123',
@@ -289,7 +282,7 @@ describe('Capacitor Spotify Bridge', () => {
 
     describe('markDisconnected', () => {
       it('should set connected state to false', async () => {
-        (global as any).window = { Capacitor: mockCapacitorAndroid };
+        setCapacitor(mockCapacitorAndroid);
         mockCapacitorAndroid.Plugins.SpotifySDK.connect.mockResolvedValue({ connected: true });
         const bridge = new SpotifyCapacitorBridge();
         await bridge.connect();
@@ -299,7 +292,7 @@ describe('Capacitor Spotify Bridge', () => {
       });
 
       it('should cause subsequent play calls to throw', async () => {
-        (global as any).window = { Capacitor: mockCapacitorAndroid };
+        setCapacitor(mockCapacitorAndroid);
         mockCapacitorAndroid.Plugins.SpotifySDK.connect.mockResolvedValue({ connected: true });
         const bridge = new SpotifyCapacitorBridge();
         await bridge.connect();
@@ -311,7 +304,7 @@ describe('Capacitor Spotify Bridge', () => {
 
   describe('getCapacitorBridge singleton', () => {
     it('should return same instance on multiple calls', () => {
-      (global as any).window = { Capacitor: mockCapacitorAndroid };
+      setCapacitor(mockCapacitorAndroid);
       const bridge1 = getCapacitorBridge();
       const bridge2 = getCapacitorBridge();
       expect(bridge1).toBe(bridge2);

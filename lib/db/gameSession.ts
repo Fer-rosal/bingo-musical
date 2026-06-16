@@ -23,6 +23,9 @@ export async function createGameSession(
   config: OnlineGameConfig,
   hostDeviceId?: string
 ): Promise<GameSession> {
+  if (!hostSpotifyId) throw new Error('hostSpotifyId is required');
+  if (!playlistId) throw new Error('playlistId is required');
+
   const gameCode = generateGameCode();
   const now = Date.now();
 

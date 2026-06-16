@@ -32,9 +32,10 @@ export function shuffle<T>(arr: T[], seed?: string): T[] {
 }
 
 export function getPreMarkedIndices(gridSize: 4 | 5, count: number, seed?: string): number[] {
+  if (count === 0) return []
   const total = gridSize * gridSize
   const center = Math.floor(total / 2)
-  if (count <= 1) return [center]
+  if (count === 1) return [center]
   const pool = Array.from({ length: total }, (_, i) => i).filter(i => i !== center)
   const extras = shuffle(pool, seed ? `${seed}_premarked` : undefined).slice(0, count - 1)
   return [center, ...extras]

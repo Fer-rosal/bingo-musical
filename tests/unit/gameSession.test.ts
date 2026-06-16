@@ -237,6 +237,7 @@ describe('Game Session Database Operations', () => {
 
     it('should not return finished games', async () => {
       (collection as jest.Mock).mockReturnValue({});
+      (where as jest.Mock).mockReturnValue({ _type: 'where-clause' });
       (query as jest.Mock).mockReturnValue({});
       (getDocs as jest.Mock).mockResolvedValue({ empty: true, docs: [] });
 
@@ -245,7 +246,7 @@ describe('Game Session Database Operations', () => {
 
       expect(query).toHaveBeenCalled();
       const queryCall = (query as jest.Mock).mock.calls[0];
-      expect(queryCall[1]).toBeDefined(); // where clause exists
+      expect(queryCall[1]).toBeDefined(); // at least one where clause passed to query
     });
   });
 

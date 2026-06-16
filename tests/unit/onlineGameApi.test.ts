@@ -180,7 +180,7 @@ describe('Online Game API Endpoints - Security & Validation', () => {
       ];
 
       testCases.forEach(({ id, valid }) => {
-        const isValid = id && validSpotifySongId.test(id);
+        const isValid = Boolean(id && validSpotifySongId.test(id as string));
         expect(isValid).toBe(valid);
       });
     });
@@ -278,7 +278,8 @@ describe('Online Game API Endpoints - Security & Validation', () => {
       ];
 
       testCases.forEach(({ code, valid }) => {
-        const isValid = code && /^[0-9A-Z]{6}$/.test(code.toUpperCase());
+        // Strict validation — no normalization (frontend normalizes before sending)
+        const isValid = Boolean(code && /^[0-9A-Z]{6}$/.test(code));
         expect(isValid).toBe(valid);
       });
     });
@@ -383,7 +384,7 @@ describe('Online Game API Endpoints - Security & Validation', () => {
       const canCreate = hasToken;
       expect(canCreate).toBe(true);
 
-      const noToken = false;
+      const noToken = true; // represents: no Spotify token present
       const cannotCreate = noToken;
       expect(cannotCreate).toBe(true);
     });

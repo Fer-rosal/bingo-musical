@@ -12,10 +12,11 @@ export function generateGameCode(): string {
 }
 
 /**
- * Validate game code format
+ * Validate game code format (strict — does not normalize; use normalizeGameCode first if needed)
  */
 export function isValidGameCode(code: string): boolean {
-  return /^[0-9A-Z]{6}$/.test(code.toUpperCase());
+  if (!code) return false;
+  return /^[0-9A-Z]{6}$/.test(code);
 }
 
 /**

@@ -7,7 +7,7 @@ export default defineConfig({
   reporter: 'list',
   use: {
     headless: true, // ALWAYS headless — no display required on server
-    baseURL: 'http://localhost:3000',
+    baseURL: process.env.BASE_URL ?? 'http://localhost:3000',
     screenshot: 'only-on-failure',
     video: 'off',
   },
