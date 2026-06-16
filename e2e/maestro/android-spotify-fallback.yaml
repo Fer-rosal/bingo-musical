@@ -1,0 +1,58 @@
+appId: com.bingomusical.app
+name: Spotify Not Installed Fallback
+tags:
+  - android
+  - fallback
+
+---
+
+# Tests the "Spotify not installed" path.
+#
+# This is the ONLY testable path on the standard google_apis emulator image,
+# since Spotify cannot be installed via Play Store on this image.
+#
+# Expected flow:
+#   1. App launches, login screen renders with spotify-connect-btn visible
+#   2. User taps the connect button
+#   3. SpotifySDKPlugin.connect() calls SpotifyAppRemote.connect()
+#   4. onFailure is called immediately (no Spotify app installed)
+#   5. Plugin rejects with "APP_NOT_INSTALLED"
+#   6. JS bridge (capacitor-bridge.ts) catches → returns connected: false
+#   7. AndroidSpotifyService sets lastError.code = 'APP_NOT_INSTALLED'
+#   8. SpotifyConnect component transitions to 'failed' state
+#   9. spotify-connect-status shows an error/fallback message
+#  10. spotify-connect-retry-btn becomes visible
+#
+# ADB simulation (for reference, not used here):
+#   adb shell am start -W -a android.intent.action.VIEW \
+#     -d "bingo-musical://callback?code=test&state=test" com.bingomusical.app
+
+- launchApp:
+    appId: com.bingomusical.app
+    clearState: true
+
+- assertVisible:
+    id: "spotify-connect-btn"
+    timeout: 10000
+
+- tapOn:
+    id: "spotify-connect-btn"
+
+# After tapping on an emulator without Spotify:
+# SpotifySDKPlugin.connect() → onFailure → "APP_NOT_INSTALLED" rejection
+# JS bridge catches → shouldFallback: true
+# SpotifyConnect transitions to 'failed' state → shows status message
+
+- assertVisible:
+    id: "spotify-connect-status"
+    timeout: 8000
+
+- takeScreenshot: "spotify-fallback-status"
+
+# Retry button appears in 'failed' state
+
+- assertVisible:
+    id: "spotify-connect-retry-btn"
+    timeout: 5000
+
+- takeScreenshot: "spotify-fallback-retry-visible"

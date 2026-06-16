@@ -10,7 +10,12 @@
     "cap:add:android": "npx cap add android",
     "cap:sync": "npx cap sync",
     "cap:build:android": "cd android && ./gradlew build",
-    "cap:run:android": "npx cap run android"
+    "cap:run:android": "npx cap run android",
+    "setup:android-emulator": "bash scripts/setup-android-emulator.sh",
+    "build:android": "npx cap sync android",
+    "build:android:debug": "cd android && NEXT_PUBLIC_SPOTIFY_CLIENT_ID=$NEXT_PUBLIC_SPOTIFY_CLIENT_ID ./gradlew assembleDebug",
+    "test:android": "bash scripts/run-android-e2e.sh",
+    "e2e:android": "bash scripts/run-android-e2e.sh"
   },
   "dependencies": {
     "@capacitor/android": "^6.1.0",
@@ -29,6 +34,7 @@
     "spotify-web-api-js": "^1.5.2"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.4.0",
     "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",

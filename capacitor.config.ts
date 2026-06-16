@@ -6,6 +6,7 @@ type CapacitorConfig = {
   webDir: string;
   server?: {
     androidScheme?: string;
+    url?: string;
   };
   plugins?: {
     [key: string]: unknown;
@@ -13,11 +14,17 @@ type CapacitorConfig = {
 };
 
 const config: CapacitorConfig = {
-  appId: process.env.NEXT_PUBLIC_CAPACITOR_ANDROID_APP_ID || 'com.bingo-musical.app',
+  // ARCHITECT_NOTE: Capacitor requires Java package format (no dashes). com.bingo-musical.app
+  // is invalid on Android. Using com.bingomusical.app as the canonical package name, matching
+  // the Kotlin source package. Flagging for Architect review.
+  appId: process.env.NEXT_PUBLIC_CAPACITOR_ANDROID_APP_ID || 'com.bingomusical.app',
   appName: 'Bingo Musical',
   webDir: 'out',
   server: {
     androidScheme: 'https',
+    // WebView loads from the deployed app URL so server-side API routes keep working.
+    // Set NEXT_PUBLIC_APP_URL in .env.local for local dev (e.g. http://localhost:3000).
+    url: process.env.NEXT_PUBLIC_APP_URL,
   },
   plugins: {
     SplashScreen: {
