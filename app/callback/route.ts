@@ -55,7 +55,9 @@ export async function GET(request: NextRequest) {
     }
 
     const { access_token, refresh_token, expires_in } = await tokenResponse.json()
-    const response = NextResponse.redirect(`${origin}/dashboard`)
+    const returnTo = request.cookies.get('auth_return_to')?.value
+    const redirectPath = returnTo && returnTo.startsWith('/') ? returnTo : '/dashboard'
+    const response = NextResponse.redirect(`${origin}${redirectPath}`)
     const expiresAt = Date.now() + expires_in * 1000
 
     response.cookies.set('spotify_access_token', access_token, {
@@ -83,6 +85,7 @@ export async function GET(request: NextRequest) {
 
     response.cookies.delete('spotify_auth_state')
     response.cookies.delete('spotify_code_verifier')
+    response.cookies.delete('auth_return_to')
     return response
   } catch (error) {
     console.error('Callback error:', error)

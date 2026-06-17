@@ -6,6 +6,7 @@ type CapacitorConfig = {
   webDir: string;
   server?: {
     androidScheme?: string;
+    iosScheme?: string;
     url?: string;
   };
   plugins?: {
@@ -22,6 +23,7 @@ const config: CapacitorConfig = {
   webDir: 'out',
   server: {
     androidScheme: 'https',
+    iosScheme: 'https',
     // WebView loads from the deployed app URL so server-side API routes keep working.
     // Set NEXT_PUBLIC_APP_URL in .env.local for local dev (e.g. http://localhost:3000).
     url: process.env.NEXT_PUBLIC_APP_URL,

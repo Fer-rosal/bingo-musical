@@ -67,7 +67,7 @@ export class SpotifyCapacitorBridge {
 
   constructor() {
     this.platform = detectPlatform();
-    if (this.platform === 'android') {
+    if (this.platform === 'android' || this.platform === 'ios') {
       this.plugin = getSpotifyPlugin();
     }
   }
@@ -76,7 +76,7 @@ export class SpotifyCapacitorBridge {
    * Check if native Spotify bridge is available
    */
   isAvailable(): boolean {
-    return this.platform === 'android' && this.plugin !== null;
+    return (this.platform === 'android' || this.platform === 'ios') && this.plugin !== null;
   }
 
   /**

@@ -31,7 +31,20 @@ export default function CreateOnlineGamePage() {
       try {
         const res = await fetch('/api/playlists');
         if (res.status === 401) {
-          router.push('/login');
+          // Store return destination, then kick off Spotify auth directly so
+          // the callback lands back here instead of /dashboard.
+          document.cookie = 'auth_return_to=/online/create; path=/; max-age=600; SameSite=Lax';
+          const authRes = await fetch('/api/auth/spotify-login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({}),
+          });
+          if (authRes.ok) {
+            const { authUrl } = await authRes.json();
+            window.location.href = authUrl;
+          } else {
+            router.push('/login');
+          }
           return;
         }
         if (!res.ok) throw new Error();

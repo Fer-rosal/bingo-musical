@@ -1,0 +1,29 @@
+<!-- Info.plist.additions.xml
+     Merge these keys into ios/App/App/Info.plist after `npx cap add ios`.
+     In Xcode: open Info.plist as source code and paste inside the root <dict>. -->
+
+<!-- 1. Allow the app to query whether Spotify is installed -->
+<key>LSApplicationQueriesSchemes</key>
+<array>
+    <string>spotify</string>
+</array>
+
+<!-- 2. Register the bingo-musical:// URL scheme so Spotify can redirect back after auth -->
+<key>CFBundleURLTypes</key>
+<array>
+    <dict>
+        <key>CFBundleURLName</key>
+        <string>com.bingomusical.app</string>
+        <key>CFBundleURLSchemes</key>
+        <array>
+            <string>bingo-musical</string>
+        </array>
+    </dict>
+</array>
+
+<!-- 3. Expose SPOTIFY_CLIENT_ID to the app bundle so SpotifySDKPlugin can read it.
+     Set the actual value via Xcode → Build Settings → User-Defined → SPOTIFY_CLIENT_ID
+     then reference it here with $(SPOTIFY_CLIENT_ID).
+     Never hardcode the client ID in source. -->
+<key>SPOTIFY_CLIENT_ID</key>
+<string>$(SPOTIFY_CLIENT_ID)</string>

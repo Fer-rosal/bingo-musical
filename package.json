@@ -15,11 +15,16 @@
     "build:android": "npx cap sync android",
     "build:android:debug": "cd android && NEXT_PUBLIC_SPOTIFY_CLIENT_ID=$NEXT_PUBLIC_SPOTIFY_CLIENT_ID ./gradlew assembleDebug",
     "test:android": "bash scripts/run-android-e2e.sh",
-    "e2e:android": "bash scripts/run-android-e2e.sh"
+    "e2e:android": "bash scripts/run-android-e2e.sh",
+    "cap:add:ios": "npx cap add ios",
+    "build:ios": "npx cap sync ios",
+    "cap:run:ios": "npx cap run ios",
+    "setup:ios-native": "bash scripts/setup-ios-native.sh"
   },
   "dependencies": {
     "@capacitor/android": "^6.1.0",
     "@capacitor/core": "^6.1.0",
+    "@capacitor/ios": "^6.1.0",
     "axios": "^1.16.1",
     "firebase": "^12.14.0",
     "html2canvas": "^1.4.1",
