@@ -9,8 +9,14 @@ let cachedDb: Firestore | null = null;
 export function getAdminDb(): Firestore {
   if (cachedDb) return cachedDb;
 
-  const privateKey = (process.env.FIREBASE_PRIVATE_KEY ?? '')
-    .replace(/\\n/g, '\n');   // Vercel stores multiline values as literal \n
+  let privateKey = (process.env.FIREBASE_PRIVATE_KEY ?? '').trim();
+  // Strip surrounding quotes (common when pasting from .env.local or JSON into Vercel UI)
+  if ((privateKey.startsWith('"') && privateKey.endsWith('"')) ||
+      (privateKey.startsWith("'") && privateKey.endsWith("'"))) {
+    privateKey = privateKey.slice(1, -1);
+  }
+  // Convert literal \n sequences to actual newlines (Vercel stores them this way)
+  privateKey = privateKey.replace(/\\n/g, '\n');
 
   const app =
     getApps().length > 0
