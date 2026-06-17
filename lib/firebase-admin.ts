@@ -18,6 +18,14 @@ export function getAdminDb(): Firestore {
   // Convert literal \n sequences to actual newlines (Vercel stores them this way)
   privateKey = privateKey.replace(/\\n/g, '\n');
 
+  // ponytail: diagnostic only — remove after key format confirmed
+  console.log('[firebase-admin] key diag:', {
+    totalLength: privateKey.length,
+    first30: JSON.stringify(privateKey.slice(0, 30)),
+    last30: JSON.stringify(privateKey.slice(-30)),
+    lineCount: privateKey.split('\n').length,
+  });
+
   const app =
     getApps().length > 0
       ? getApps()[0]
