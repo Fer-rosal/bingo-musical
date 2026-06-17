@@ -4,9 +4,25 @@ import { sendGameCreatedEmail } from '@/lib/email';
 
 export async function POST(request: NextRequest) {
   try {
-    const { hostSpotifyId, hostEmail, playlistId, playlistName, playlistImageUrl, gridSize, preMarkedCount, hostDeviceId } = await request.json();
+    const accessToken = request.cookies.get('spotify_access_token')?.value;
+    if (!accessToken) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
 
-    if (!hostSpotifyId || !hostEmail || !playlistId || !playlistName) {
+    const spotifyRes = await fetch('https://api.spotify.com/v1/me', {
+      headers: { Authorization: `Bearer ${accessToken}` },
+      cache: 'no-store',
+    });
+    if (!spotifyRes.ok) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+    const me = await spotifyRes.json();
+    const hostSpotifyId: string = me.id;
+    const hostEmail: string = me.email ?? '';
+
+    const { playlistId, playlistName, playlistImageUrl, gridSize, preMarkedCount, hostDeviceId } = await request.json();
+
+    if (!playlistId || !playlistName) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }

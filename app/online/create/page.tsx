@@ -23,9 +23,6 @@ export default function CreateOnlineGamePage() {
   const [preMarkedCount, setPreMarkedCount] = useState(0);
   const [error, setError] = useState('');
   const [createdGame, setCreatedGame] = useState<GameSessionCreated | null>(null);
-  const [hostEmail, setHostEmail] = useState('');
-  const [spotifyId, setSpotifyId] = useState('');
-
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -51,14 +48,6 @@ export default function CreateOnlineGamePage() {
         const { playlists } = await res.json();
         setPlaylists(playlists);
         setStep('pick-playlist');
-
-        // Get user profile for email
-        const profileRes = await fetch('/api/auth/profile');
-        if (profileRes.ok) {
-          const profile = await profileRes.json();
-          setHostEmail(profile.email);
-          setSpotifyId(profile.id);
-        }
       } catch {
         setError('No se pudo obtener tus playlists');
         setStep('pick-playlist');
@@ -84,8 +73,6 @@ export default function CreateOnlineGamePage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          hostSpotifyId: spotifyId,
-          hostEmail,
           playlistId: selectedPlaylist.id,
           playlistName: selectedPlaylist.name,
           playlistImageUrl: selectedPlaylist.images?.[0]?.url,
