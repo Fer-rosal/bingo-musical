@@ -1,14 +1,4 @@
-import {
-  collection,
-  doc,
-  setDoc,
-  getDoc,
-  getDocs,
-  updateDoc,
-  query,
-  where,
-} from 'firebase/firestore';
-import { db } from '@/lib/firebase';
+import { adminDb } from '@/lib/firebase-admin';
 import { GameSession, GamePlayer, OnlineGameConfig } from '@/types/online';
 import { generateGameCode } from '@/lib/gameCode';
 
@@ -28,9 +18,10 @@ export async function createGameSession(
 
   const gameCode = generateGameCode();
   const now = Date.now();
+  const ref = adminDb.collection(GAMES_COLLECTION).doc();
 
   const gameData: GameSession = {
-    id: doc(collection(db, GAMES_COLLECTION)).id, // Generate doc ID
+    id: ref.id,
     hostSpotifyId,
     hostEmail,
     playlistId,
@@ -47,37 +38,26 @@ export async function createGameSession(
     hostDeviceId,
   };
 
-  const gameRef = doc(db, GAMES_COLLECTION, gameData.id);
-  await setDoc(gameRef, gameData);
-
+  await ref.set(gameData);
   return gameData;
 }
 
 export async function getGameSessionById(gameId: string): Promise<GameSession | null> {
-  const gameRef = doc(db, GAMES_COLLECTION, gameId);
-  const gameSnap = await getDoc(gameRef);
-
-  if (!gameSnap.exists()) {
-    return null;
-  }
-
-  return gameSnap.data() as GameSession;
+  const snap = await adminDb.collection(GAMES_COLLECTION).doc(gameId).get();
+  if (!snap.exists) return null;
+  return snap.data() as GameSession;
 }
 
 export async function getGameSessionByCode(gameCode: string): Promise<GameSession | null> {
-  const q = query(
-    collection(db, GAMES_COLLECTION),
-    where('gameCode', '==', gameCode),
-    where('status', '!=', 'finished')
-  );
+  const snap = await adminDb
+    .collection(GAMES_COLLECTION)
+    .where('gameCode', '==', gameCode)
+    .where('status', '!=', 'finished')
+    .limit(1)
+    .get();
 
-  const querySnapshot = await getDocs(q);
-
-  if (querySnapshot.empty) {
-    return null;
-  }
-
-  return querySnapshot.docs[0].data() as GameSession;
+  if (snap.empty) return null;
+  return snap.docs[0].data() as GameSession;
 }
 
 export async function addPlayerToGame(
@@ -86,22 +66,16 @@ export async function addPlayerToGame(
   spotifyId?: string,
   email?: string
 ): Promise<number> {
-  const gameRef = doc(db, GAMES_COLLECTION, gameId);
-  const gameSnap = await getDoc(gameRef);
+  const ref = adminDb.collection(GAMES_COLLECTION).doc(gameId);
+  const snap = await ref.get();
 
-  if (!gameSnap.exists()) {
-    throw new Error('Game not found');
-  }
+  if (!snap.exists) throw new Error('Game not found');
 
-  const game = gameSnap.data() as GameSession;
+  const game = snap.data() as GameSession;
+  if (game.status === 'finished') throw new Error('Game is finished');
 
-  if (game.status === 'finished') {
-    throw new Error('Game is finished');
-  }
-
-  const playerIndex = game.players.length;
   const newPlayer: GamePlayer = {
-    index: playerIndex,
+    index: game.players.length,
     name: playerName,
     spotifyId,
     email,
@@ -111,52 +85,35 @@ export async function addPlayerToGame(
   game.players.push(newPlayer);
   game.playerCount = game.players.length;
 
-  await updateDoc(gameRef, {
-    players: game.players,
-    playerCount: game.playerCount,
-  });
-
-  return playerIndex;
+  await ref.update({ players: game.players, playerCount: game.playerCount });
+  return newPlayer.index;
 }
 
 export async function updateGameStatus(
   gameId: string,
   status: 'waiting' | 'playing' | 'finished'
 ): Promise<void> {
-  const gameRef = doc(db, GAMES_COLLECTION, gameId);
+  const updateData: Record<string, unknown> = { status };
+  if (status === 'playing') updateData.startedAt = Date.now();
+  else if (status === 'finished') updateData.endedAt = Date.now();
 
-  const updateData: any = { status };
-  if (status === 'playing') {
-    updateData.startedAt = Date.now();
-  } else if (status === 'finished') {
-    updateData.endedAt = Date.now();
-  }
-
-  await updateDoc(gameRef, updateData);
+  await adminDb.collection(GAMES_COLLECTION).doc(gameId).update(updateData);
 }
 
 export async function addDrawnSong(gameId: string, songId: string): Promise<void> {
-  const gameRef = doc(db, GAMES_COLLECTION, gameId);
-  const gameSnap = await getDoc(gameRef);
+  const ref = adminDb.collection(GAMES_COLLECTION).doc(gameId);
+  const snap = await ref.get();
+  if (!snap.exists) throw new Error('Game not found');
 
-  if (!gameSnap.exists()) {
-    throw new Error('Game not found');
-  }
-
-  const game = gameSnap.data() as GameSession;
-
+  const game = snap.data() as GameSession;
   if (!game.drawnSongIds.includes(songId)) {
     game.drawnSongIds.push(songId);
-    await updateDoc(gameRef, {
-      drawnSongIds: game.drawnSongIds,
-    });
+    await ref.update({ drawnSongIds: game.drawnSongIds });
   }
 }
 
 export async function confirmWinner(gameId: string, playerIndex: number): Promise<void> {
-  const gameRef = doc(db, GAMES_COLLECTION, gameId);
-
-  await updateDoc(gameRef, {
+  await adminDb.collection(GAMES_COLLECTION).doc(gameId).update({
     status: 'finished',
     winnerPlayerIndex: playerIndex,
     endedAt: Date.now(),
@@ -164,11 +121,10 @@ export async function confirmWinner(gameId: string, playerIndex: number): Promis
 }
 
 export async function getPlayerGames(spotifyId: string): Promise<GameSession[]> {
-  const q = query(
-    collection(db, GAMES_COLLECTION),
-    where('hostSpotifyId', '==', spotifyId)
-  );
+  const snap = await adminDb
+    .collection(GAMES_COLLECTION)
+    .where('hostSpotifyId', '==', spotifyId)
+    .get();
 
-  const querySnapshot = await getDocs(q);
-  return querySnapshot.docs.map((doc) => doc.data() as GameSession);
+  return snap.docs.map((d) => d.data() as GameSession);
 }

@@ -27,6 +27,7 @@
     "@capacitor/ios": "^6.1.0",
     "axios": "^1.16.1",
     "firebase": "^12.14.0",
+    "firebase-admin": "^14.0.0",
     "html2canvas": "^1.4.1",
     "html5-qrcode": "^2.3.8",
     "js-cookie": "^3.0.8",
