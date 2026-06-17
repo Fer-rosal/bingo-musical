@@ -1,4 +1,4 @@
-import { adminDb } from '@/lib/firebase-admin';
+import { getAdminDb } from '@/lib/firebase-admin';
 import { GameSession, GamePlayer, OnlineGameConfig } from '@/types/online';
 import { generateGameCode } from '@/lib/gameCode';
 
@@ -18,7 +18,7 @@ export async function createGameSession(
 
   const gameCode = generateGameCode();
   const now = Date.now();
-  const ref = adminDb.collection(GAMES_COLLECTION).doc();
+  const ref = getAdminDb().collection(GAMES_COLLECTION).doc();
 
   const gameData: GameSession = {
     id: ref.id,
@@ -43,13 +43,13 @@ export async function createGameSession(
 }
 
 export async function getGameSessionById(gameId: string): Promise<GameSession | null> {
-  const snap = await adminDb.collection(GAMES_COLLECTION).doc(gameId).get();
+  const snap = await getAdminDb().collection(GAMES_COLLECTION).doc(gameId).get();
   if (!snap.exists) return null;
   return snap.data() as GameSession;
 }
 
 export async function getGameSessionByCode(gameCode: string): Promise<GameSession | null> {
-  const snap = await adminDb
+  const snap = await getAdminDb()
     .collection(GAMES_COLLECTION)
     .where('gameCode', '==', gameCode)
     .where('status', '!=', 'finished')
@@ -66,7 +66,7 @@ export async function addPlayerToGame(
   spotifyId?: string,
   email?: string
 ): Promise<number> {
-  const ref = adminDb.collection(GAMES_COLLECTION).doc(gameId);
+  const ref = getAdminDb().collection(GAMES_COLLECTION).doc(gameId);
   const snap = await ref.get();
 
   if (!snap.exists) throw new Error('Game not found');
@@ -97,11 +97,11 @@ export async function updateGameStatus(
   if (status === 'playing') updateData.startedAt = Date.now();
   else if (status === 'finished') updateData.endedAt = Date.now();
 
-  await adminDb.collection(GAMES_COLLECTION).doc(gameId).update(updateData);
+  await getAdminDb().collection(GAMES_COLLECTION).doc(gameId).update(updateData);
 }
 
 export async function addDrawnSong(gameId: string, songId: string): Promise<void> {
-  const ref = adminDb.collection(GAMES_COLLECTION).doc(gameId);
+  const ref = getAdminDb().collection(GAMES_COLLECTION).doc(gameId);
   const snap = await ref.get();
   if (!snap.exists) throw new Error('Game not found');
 
@@ -113,7 +113,7 @@ export async function addDrawnSong(gameId: string, songId: string): Promise<void
 }
 
 export async function confirmWinner(gameId: string, playerIndex: number): Promise<void> {
-  await adminDb.collection(GAMES_COLLECTION).doc(gameId).update({
+  await getAdminDb().collection(GAMES_COLLECTION).doc(gameId).update({
     status: 'finished',
     winnerPlayerIndex: playerIndex,
     endedAt: Date.now(),
@@ -121,7 +121,7 @@ export async function confirmWinner(gameId: string, playerIndex: number): Promis
 }
 
 export async function getPlayerGames(spotifyId: string): Promise<GameSession[]> {
-  const snap = await adminDb
+  const snap = await getAdminDb()
     .collection(GAMES_COLLECTION)
     .where('hostSpotifyId', '==', spotifyId)
     .get();
