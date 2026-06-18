@@ -51,8 +51,11 @@ export async function POST(request: NextRequest) {
   } catch (error) {
     console.error('Error creating game:', error);
     const errorMessage = error instanceof Error ? error.message : String(error);
+    const hasKey = !!process.env.FIREBASE_PRIVATE_KEY;
+    const hasProject = !!process.env.FIREBASE_PROJECT_ID;
+    const hasEmail = !!process.env.FIREBASE_CLIENT_EMAIL;
     return NextResponse.json(
-      { error: 'Failed to create game', details: errorMessage },
+      { error: 'Failed to create game', details: errorMessage, envCheck: { hasKey, hasProject, hasEmail } },
       { status: 500 }
     );
   }
