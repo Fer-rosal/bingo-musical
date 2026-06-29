@@ -1,8 +1,68 @@
-import { getAdminDb } from '@/lib/firebase-admin';
+import { getDb } from '@/lib/supabase';
 import { GameSession, GamePlayer, OnlineGameConfig } from '@/types/online';
 import { generateGameCode } from '@/lib/gameCode';
+import type { Database } from '@/types/database';
 
-const GAMES_COLLECTION = 'games';
+type GameRow = Database['public']['Tables']['games']['Row'];
+type PlayerRow = Database['public']['Tables']['players']['Row'];
+type DrawnSongRow = Database['public']['Tables']['drawn_songs']['Row'];
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+function rowToSession(
+  row: GameRow,
+  players: GamePlayer[],
+  drawnSongIds: string[],
+): GameSession {
+  return {
+    id: row.id,
+    hostSpotifyId: row.host_spotify_id,
+    hostEmail: row.host_email ?? undefined,
+    playlistId: row.playlist_id,
+    playlistName: row.playlist_name,
+    playlistImageUrl: row.playlist_image_url ?? undefined,
+    gameCode: row.game_code,
+    status: row.status,
+    gridSize: row.grid_size,
+    playerCount: players.length,
+    preMarkedCount: row.pre_marked_count,
+    drawnSongIds,
+    players,
+    createdAt: new Date(row.created_at).getTime(),
+    startedAt: row.started_at ? new Date(row.started_at).getTime() : undefined,
+    endedAt: row.ended_at ? new Date(row.ended_at).getTime() : undefined,
+    hostDeviceId: row.host_device_id ?? undefined,
+    winnerPlayerIndex: row.winner_player_index ?? undefined,
+  };
+}
+
+async function fetchPlayers(gameId: string): Promise<GamePlayer[]> {
+  const { data, error } = await getDb()
+    .from('players')
+    .select('*')
+    .eq('game_id', gameId)
+    .order('player_index');
+  if (error) throw error;
+  return ((data ?? []) as PlayerRow[]).map((r) => ({
+    index: r.player_index,
+    name: r.name,
+    spotifyId: r.spotify_id ?? undefined,
+    email: r.email ?? undefined,
+    joinedAt: new Date(r.joined_at).getTime(),
+  }));
+}
+
+async function fetchDrawnSongIds(gameId: string): Promise<string[]> {
+  const { data, error } = await getDb()
+    .from('drawn_songs')
+    .select('song_id')
+    .eq('game_id', gameId)
+    .order('draw_order');
+  if (error) throw error;
+  return ((data ?? []) as Pick<DrawnSongRow, 'song_id'>[]).map((r) => r.song_id);
+}
+
+// ── public API (same shape as before) ────────────────────────────────────────
 
 export async function createGameSession(
   hostSpotifyId: string,
@@ -11,120 +71,161 @@ export async function createGameSession(
   playlistName: string,
   playlistImageUrl: string | undefined,
   config: OnlineGameConfig,
-  hostDeviceId?: string
+  hostDeviceId?: string,
 ): Promise<GameSession> {
   if (!hostSpotifyId) throw new Error('hostSpotifyId is required');
   if (!playlistId) throw new Error('playlistId is required');
 
   const gameCode = generateGameCode();
-  const now = Date.now();
-  const ref = getAdminDb().collection(GAMES_COLLECTION).doc();
 
-  const gameData: GameSession = {
-    id: ref.id,
-    hostSpotifyId,
-    hostEmail,
-    playlistId,
-    playlistName,
-    playlistImageUrl,
-    gameCode,
-    status: 'waiting',
-    gridSize: config.gridSize,
-    playerCount: 0,
-    preMarkedCount: config.preMarkedCount,
-    drawnSongIds: [],
-    players: [],
-    createdAt: now,
-    hostDeviceId,
-  };
+  const { data, error } = await getDb()
+    .from('games')
+    .insert({
+      host_spotify_id: hostSpotifyId,
+      host_email: hostEmail || null,
+      playlist_id: playlistId,
+      playlist_name: playlistName,
+      playlist_image_url: playlistImageUrl ?? null,
+      game_code: gameCode,
+      status: 'waiting',
+      grid_size: config.gridSize,
+      pre_marked_count: config.preMarkedCount,
+      host_device_id: hostDeviceId ?? null,
+    })
+    .select()
+    .single();
 
-  await ref.set(gameData);
-  return gameData;
+  if (error) throw error;
+  return rowToSession(data, [], []);
 }
 
 export async function getGameSessionById(gameId: string): Promise<GameSession | null> {
-  const snap = await getAdminDb().collection(GAMES_COLLECTION).doc(gameId).get();
-  if (!snap.exists) return null;
-  return snap.data() as GameSession;
+  const { data, error } = await getDb()
+    .from('games')
+    .select('*')
+    .eq('id', gameId)
+    .single();
+
+  if (error || !data) return null;
+  const row = data as unknown as GameRow;
+
+  const [players, drawnSongIds] = await Promise.all([
+    fetchPlayers(gameId),
+    fetchDrawnSongIds(gameId),
+  ]);
+
+  return rowToSession(row, players, drawnSongIds);
 }
 
 export async function getGameSessionByCode(gameCode: string): Promise<GameSession | null> {
-  const snap = await getAdminDb()
-    .collection(GAMES_COLLECTION)
-    .where('gameCode', '==', gameCode)
-    .where('status', '!=', 'finished')
-    .limit(1)
-    .get();
+  const { data, error } = await getDb()
+    .from('games')
+    .select('*')
+    .eq('game_code', gameCode)
+    .neq('status', 'finished')
+    .single();
 
-  if (snap.empty) return null;
-  return snap.docs[0].data() as GameSession;
+  if (error || !data) return null;
+  const row = data as unknown as GameRow;
+
+  const [players, drawnSongIds] = await Promise.all([
+    fetchPlayers(row.id),
+    fetchDrawnSongIds(row.id),
+  ]);
+
+  return rowToSession(row, players, drawnSongIds);
 }
 
 export async function addPlayerToGame(
   gameId: string,
   playerName: string,
   spotifyId?: string,
-  email?: string
+  email?: string,
 ): Promise<number> {
-  const ref = getAdminDb().collection(GAMES_COLLECTION).doc(gameId);
-  const snap = await ref.get();
+  const db = getDb();
 
-  if (!snap.exists) throw new Error('Game not found');
+  // Count existing players to derive next index
+  const { count, error: countError } = await db
+    .from('players')
+    .select('*', { count: 'exact', head: true })
+    .eq('game_id', gameId);
 
-  const game = snap.data() as GameSession;
-  if (game.status === 'finished') throw new Error('Game is finished');
+  if (countError) throw countError;
+  const playerIndex = count ?? 0;
 
-  const newPlayer: GamePlayer = {
-    index: game.players.length,
+  const { error } = await db.from('players').insert({
+    game_id: gameId,
+    player_index: playerIndex,
     name: playerName,
-    spotifyId,
-    email,
-    joinedAt: Date.now(),
-  };
+    spotify_id: spotifyId ?? null,
+    email: email ?? null,
+  });
 
-  game.players.push(newPlayer);
-  game.playerCount = game.players.length;
-
-  await ref.update({ players: game.players, playerCount: game.playerCount });
-  return newPlayer.index;
+  if (error) throw error;
+  return playerIndex;
 }
 
 export async function updateGameStatus(
   gameId: string,
-  status: 'waiting' | 'playing' | 'finished'
+  status: 'waiting' | 'playing' | 'finished',
 ): Promise<void> {
-  const updateData: Record<string, unknown> = { status };
-  if (status === 'playing') updateData.startedAt = Date.now();
-  else if (status === 'finished') updateData.endedAt = Date.now();
+  const update: Record<string, unknown> = { status };
+  if (status === 'playing') update.started_at = new Date().toISOString();
+  else if (status === 'finished') update.ended_at = new Date().toISOString();
 
-  await getAdminDb().collection(GAMES_COLLECTION).doc(gameId).update(updateData);
+  const { error } = await getDb().from('games').update(update).eq('id', gameId);
+  if (error) throw error;
 }
 
 export async function addDrawnSong(gameId: string, songId: string): Promise<void> {
-  const ref = getAdminDb().collection(GAMES_COLLECTION).doc(gameId);
-  const snap = await ref.get();
-  if (!snap.exists) throw new Error('Game not found');
+  const db = getDb();
 
-  const game = snap.data() as GameSession;
-  if (!game.drawnSongIds.includes(songId)) {
-    game.drawnSongIds.push(songId);
-    await ref.update({ drawnSongIds: game.drawnSongIds });
-  }
+  const { count, error: countError } = await db
+    .from('drawn_songs')
+    .select('*', { count: 'exact', head: true })
+    .eq('game_id', gameId);
+
+  if (countError) throw countError;
+
+  // Ignore if already drawn (idempotent)
+  const { error } = await db.from('drawn_songs').upsert(
+    { game_id: gameId, song_id: songId, draw_order: count ?? 0 },
+    { onConflict: 'game_id,song_id' },
+  );
+
+  if (error) throw error;
 }
 
 export async function confirmWinner(gameId: string, playerIndex: number): Promise<void> {
-  await getAdminDb().collection(GAMES_COLLECTION).doc(gameId).update({
-    status: 'finished',
-    winnerPlayerIndex: playerIndex,
-    endedAt: Date.now(),
-  });
+  const { error } = await getDb()
+    .from('games')
+    .update({
+      status: 'finished',
+      winner_player_index: playerIndex >= 0 ? playerIndex : null,
+      ended_at: new Date().toISOString(),
+    })
+    .eq('id', gameId);
+
+  if (error) throw error;
 }
 
 export async function getPlayerGames(spotifyId: string): Promise<GameSession[]> {
-  const snap = await getAdminDb()
-    .collection(GAMES_COLLECTION)
-    .where('hostSpotifyId', '==', spotifyId)
-    .get();
+  const { data, error } = await getDb()
+    .from('games')
+    .select('*')
+    .eq('host_spotify_id', spotifyId)
+    .order('created_at', { ascending: false });
 
-  return snap.docs.map((d) => d.data() as GameSession);
+  if (error) throw error;
+  if (!data?.length) return [];
+
+  return Promise.all(
+    (data as GameRow[]).map(async (row) => {
+      const [players, drawnSongIds] = await Promise.all([
+        fetchPlayers(row.id),
+        fetchDrawnSongIds(row.id),
+      ]);
+      return rowToSession(row, players, drawnSongIds);
+    }),
+  );
 }

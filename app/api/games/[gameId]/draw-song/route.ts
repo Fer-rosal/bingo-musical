@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getGameSessionById, addDrawnSong } from '@/lib/db/gameSession';
+import { getGameSessionById, addDrawnSong, updateGameStatus } from '@/lib/db/gameSession';
 
 export async function POST(
   request: NextRequest,
@@ -31,6 +31,9 @@ export async function POST(
       );
     }
 
+    if (game.status === 'waiting') {
+      await updateGameStatus(gameId, 'playing');
+    }
     await addDrawnSong(gameId, songId);
 
     return NextResponse.json({ success: true });

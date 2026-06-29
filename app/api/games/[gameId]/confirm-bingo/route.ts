@@ -7,15 +7,8 @@ export async function POST(
   { params }: { params: { gameId: string } }
 ) {
   try {
-    const { playerIndex, gameType } = await request.json();
+    const { playerIndex } = await request.json();
     const gameId = params.gameId;
-
-    if (playerIndex === undefined || !gameType) {
-      return NextResponse.json(
-        { error: 'Player index and game type are required' },
-        { status: 400 }
-      );
-    }
 
     const game = await getGameSessionById(gameId);
     if (!game) {
@@ -32,35 +25,21 @@ export async function POST(
       );
     }
 
-    const winner = game.players[playerIndex];
-    if (!winner) {
-      return NextResponse.json(
-        { error: 'Player not found' },
-        { status: 404 }
-      );
-    }
+    const winnerIndex = playerIndex ?? -1;
+    await confirmWinner(gameId, winnerIndex);
 
-    await confirmWinner(gameId, playerIndex);
-
-    // Send confirmation emails
+    // Send completion emails
     try {
+      const winner = game.players[winnerIndex];
       if (game.hostEmail) {
-        await sendGameWinnerEmail(game.hostEmail, winner.name, game.gameCode, gameType);
+        await sendGameWinnerEmail(game.hostEmail, winner?.name ?? 'Ganador', game.gameCode, 'bingo');
       }
-
-      if (winner.email) {
+      if (winner?.email) {
         await sendPlayerGameSummaryEmail(winner.email, winner.name, game.gameCode, 'winner');
       }
-
-      // Send emails to other players if they provided emails
       for (const player of game.players) {
-        if (player.index !== playerIndex && player.email) {
-          await sendPlayerGameSummaryEmail(
-            player.email,
-            player.name,
-            game.gameCode,
-            'participant'
-          );
+        if (player.index !== winnerIndex && player.email) {
+          await sendPlayerGameSummaryEmail(player.email, player.name, game.gameCode, 'participant');
         }
       }
     } catch (emailError) {
