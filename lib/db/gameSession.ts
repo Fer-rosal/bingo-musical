@@ -125,7 +125,12 @@ export async function getGameSessionByCode(gameCode: string): Promise<GameSessio
     .neq('status', 'finished')
     .single();
 
-  if (error || !data) return null;
+  if (error) {
+    // [DEBUG-b7c1] surface real Supabase error so search route can log/return it
+    console.error('[DEBUG-b7c1] getGameSessionByCode error', { gameCode, error });
+    return null;
+  }
+  if (!data) return null;
   const row = data as unknown as GameRow;
 
   const [players, drawnSongIds] = await Promise.all([
