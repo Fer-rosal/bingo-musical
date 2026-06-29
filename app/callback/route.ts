@@ -1,3 +1,94 @@
-import { GET } from '../api/auth/callback/route'
+import { NextRequest, NextResponse } from 'next/server'
 
-export { GET }
+export async function GET(request: NextRequest) {
+  const searchParams = request.nextUrl.searchParams
+  const code = searchParams.get('code')
+  const state = searchParams.get('state')
+  const error = searchParams.get('error')
+  const origin = request.headers.get('x-forwarded-proto') && request.headers.get('x-forwarded-host')
+    ? `${request.headers.get('x-forwarded-proto')}://${request.headers.get('x-forwarded-host')}`
+    : request.nextUrl.origin
+
+  if (error) {
+    return NextResponse.redirect(`${origin}?error=${encodeURIComponent(error)}`)
+  }
+
+  if (!code || !state) {
+    return NextResponse.json({ error: 'Missing authorization code or state' }, { status: 400 })
+  }
+
+  const storedState = request.cookies.get('spotify_auth_state')?.value
+  if (!storedState || storedState !== state) {
+    return NextResponse.json({ error: 'State mismatch' }, { status: 400 })
+  }
+
+  const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
+  const codeVerifier = request.cookies.get('spotify_code_verifier')?.value
+
+  const protocol = request.headers.get('x-forwarded-proto') || 'https'
+  const host = request.headers.get('host') || request.nextUrl.host
+  const redirectUri = `${protocol}://${host}/callback`
+
+  if (!clientId || !clientSecret || !codeVerifier) {
+    return NextResponse.json({ error: 'Missing configuration' }, { status: 500 })
+  }
+
+  try {
+    const tokenResponse = await fetch('https://accounts.spotify.com/api/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'authorization_code',
+        code,
+        redirect_uri: redirectUri,
+        client_id: clientId,
+        client_secret: clientSecret,
+        code_verifier: codeVerifier,
+      }).toString(),
+    })
+
+    if (!tokenResponse.ok) {
+      const error = await tokenResponse.json()
+      console.error('Token exchange failed:', error)
+      return NextResponse.json({ error: 'Failed to exchange code' }, { status: 400 })
+    }
+
+    const { access_token, refresh_token, expires_in } = await tokenResponse.json()
+    const returnTo = request.cookies.get('auth_return_to')?.value
+    const redirectPath = returnTo && returnTo.startsWith('/') ? returnTo : '/dashboard'
+    const response = NextResponse.redirect(`${origin}${redirectPath}`)
+    const expiresAt = Date.now() + expires_in * 1000
+
+    response.cookies.set('spotify_access_token', access_token, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: expires_in,
+    })
+
+    response.cookies.set('spotify_token_expires_at', expiresAt.toString(), {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: expires_in,
+    })
+
+    if (refresh_token) {
+      response.cookies.set('spotify_refresh_token', refresh_token, {
+        httpOnly: true,
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: 'lax',
+        maxAge: 60 * 60 * 24 * 365,
+      })
+    }
+
+    response.cookies.delete('spotify_auth_state')
+    response.cookies.delete('spotify_code_verifier')
+    response.cookies.delete('auth_return_to')
+    return response
+  } catch (error) {
+    console.error('Callback error:', error)
+    return NextResponse.json({ error: 'Authentication failed' }, { status: 500 })
+  }
+}

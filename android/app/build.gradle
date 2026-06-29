@@ -1,0 +1,86 @@
+apply plugin: 'com.android.application'
+// Kotlin Android plugin — required for SpotifySDKPlugin.kt and MainActivity.kt
+apply plugin: 'kotlin-android'
+
+android {
+    namespace = "com.bingomusical.app"
+    compileSdk = rootProject.ext.compileSdkVersion
+    defaultConfig {
+        applicationId "com.bingomusical.app"
+        minSdkVersion rootProject.ext.minSdkVersion
+        targetSdkVersion rootProject.ext.targetSdkVersion
+        versionCode 1
+        versionName "1.0"
+        testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
+        aaptOptions {
+             // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
+             // Default: https://android.googlesource.com/platform/frameworks/base/+/282e181b58cf72b6ca770dc7ca5f91f135444502/tools/aapt/AaptAssets.cpp#61
+            ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
+        }
+
+        // Expose SPOTIFY_CLIENT_ID to Kotlin via BuildConfig
+        // Reads from NEXT_PUBLIC_SPOTIFY_CLIENT_ID env var at Gradle build time — not hardcoded in source
+        buildConfigField "String", "SPOTIFY_CLIENT_ID", "\"${System.getenv('NEXT_PUBLIC_SPOTIFY_CLIENT_ID') ?: ''}\""
+    }
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+        }
+    }
+    buildFeatures {
+        buildConfig = true
+    }
+    // Allow mixed Java/Kotlin sources in the same directory
+    sourceSets {
+        main {
+            java.srcDirs = ['src/main/java']
+        }
+    }
+}
+
+repositories {
+    flatDir{
+        dirs '../capacitor-cordova-android-plugins/src/main/libs', 'libs'
+    }
+    // Spotify Android App Remote SDK Maven repository
+    // ARCHITECT_NOTE: Official Spotify docs distribute the SDK as a local AAR import.
+    // The spec specified this Maven URL (spotify.github.io/android-sdk-bintray/releases).
+    // If this repository is unreachable, fall back to local AAR import:
+    //   1. Download spotify-app-remote-release-0.8.0.aar from github.com/spotify/android-sdk/releases
+    //   2. Place it in android/app/libs/
+    //   3. Replace the implementation below with: implementation files('libs/spotify-app-remote-release-0.8.0.aar')
+    maven { url 'https://spotify.github.io/android-sdk-bintray/releases' }
+}
+
+dependencies {
+    implementation fileTree(include: ['*.jar'], dir: 'libs')
+    implementation "androidx.appcompat:appcompat:$androidxAppCompatVersion"
+    implementation "androidx.coordinatorlayout:coordinatorlayout:$androidxCoordinatorLayoutVersion"
+    implementation "androidx.core:core-splashscreen:$coreSplashScreenVersion"
+    implementation project(':capacitor-android')
+    testImplementation "junit:junit:$junitVersion"
+    androidTestImplementation "androidx.test.ext:junit:$androidxJunitVersion"
+    androidTestImplementation "androidx.test.espresso:espresso-core:$androidxEspressoCoreVersion"
+    implementation project(':capacitor-cordova-android-plugins')
+
+    // Kotlin standard library
+    implementation "org.jetbrains.kotlin:kotlin-stdlib:1.9.24"
+
+    // Spotify Android App Remote SDK
+    // Required by SpotifySDKPlugin.kt — controls Spotify playback via native SDK
+    implementation 'com.spotify.android:app-remote:0.8.0'
+    // Gson is required by the Spotify App Remote SDK for serialisation
+    implementation 'com.google.code.gson:gson:2.10.1'
+}
+
+apply from: 'capacitor.build.gradle'
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
+}

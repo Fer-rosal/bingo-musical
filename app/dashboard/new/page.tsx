@@ -25,7 +25,7 @@ export default function NewGamePage() {
     const fetchPlaylists = async () => {
       try {
         const res = await fetch('/api/playlists')
-        if (res.status === 401) { router.push('/api/auth/login'); return }
+        if (res.status === 401) { router.push('/login'); return }
         if (!res.ok) throw new Error()
         const { playlists } = await res.json()
         setPlaylists(playlists)
@@ -147,23 +147,24 @@ export default function NewGamePage() {
           {playlists.length === 0 ? (
             <p className="text-[#a3a3a3] text-center py-16">No hay playlists disponibles</p>
           ) : (
-            <ul className="space-y-2">
-              {playlists.map(p => (
-                <li key={p.id}>
-                  <button
-                    onClick={() => handleSelectPlaylist(p)}
-                    className="w-full bg-[#141414] hover:bg-[#1e1e1e] border border-[#2a2a2a] hover:border-[#1DB954]/40 rounded-2xl p-4 text-left transition-all duration-150 group"
-                  >
-                    <p className="font-semibold text-white group-hover:text-[#1DB954] transition-colors">
-                      {p.name}
-                    </p>
-                    <p className="text-sm text-[#a3a3a3] mt-0.5">
-                      {p.tracks?.total ?? '?'} canciones · {p.owner?.display_name || 'Spotify'}
-                    </p>
-                  </button>
-                </li>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-96 overflow-y-auto">
+              {playlists.map((playlist) => (
+                <button
+                  key={playlist.id}
+                  onClick={() => handleSelectPlaylist(playlist)}
+                  className="p-4 bg-[#282828] hover:bg-[#333333] border border-[#404040] rounded-lg text-left transition-all duration-200 group"
+                >
+                  {playlist.images?.[0] && (
+                    <img
+                      src={playlist.images[0].url}
+                      alt={playlist.name}
+                      className="w-full h-32 object-cover rounded mb-3"
+                    />
+                  )}
+                  <h3 className="text-white font-bold group-hover:text-[#1DB954]">{playlist.name}</h3>
+                </button>
               ))}
-            </ul>
+            </div>
           )}
         </div>
       </main>

@@ -6,19 +6,41 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "cap:add:android": "npx cap add android",
+    "cap:sync": "npx cap sync",
+    "cap:build:android": "cd android && ./gradlew build",
+    "cap:run:android": "npx cap run android",
+    "setup:android-emulator": "bash scripts/setup-android-emulator.sh",
+    "build:android": "npx cap sync android",
+    "build:android:debug": "cd android && NEXT_PUBLIC_SPOTIFY_CLIENT_ID=$NEXT_PUBLIC_SPOTIFY_CLIENT_ID ./gradlew assembleDebug",
+    "test:android": "bash scripts/run-android-e2e.sh",
+    "e2e:android": "bash scripts/run-android-e2e.sh",
+    "cap:add:ios": "npx cap add ios",
+    "build:ios": "npx cap sync ios",
+    "cap:run:ios": "npx cap run ios",
+    "setup:ios-native": "bash scripts/setup-ios-native.sh"
   },
   "dependencies": {
+    "@capacitor/android": "^6.1.0",
+    "@capacitor/core": "^6.1.0",
+    "@capacitor/ios": "^6.1.0",
+    "@supabase/supabase-js": "^2.108.2",
     "axios": "^1.16.1",
     "html2canvas": "^1.4.1",
+    "html5-qrcode": "^2.3.8",
     "js-cookie": "^3.0.8",
     "jspdf": "^4.2.1",
     "next": "16.2.7",
+    "qrcode": "^1.5.4",
+    "qrcode.react": "^4.2.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "spotify-web-api-js": "^1.5.2"
   },
   "devDependencies": {
+    "@capacitor/cli": "^8.4.0",
+    "@playwright/test": "^1.60.0",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.2",
@@ -30,9 +52,10 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
     "jest": "^30.4.2",
+    "jest-environment-jsdom": "^30.4.1",
     "tailwindcss": "^4",
     "ts-jest": "^29.4.11",
     "typescript": "^5",
-    "vercel": "^54.7.1"
+    "vercel": "^54.9.1"
   }
 }
