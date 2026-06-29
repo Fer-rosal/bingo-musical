@@ -4,11 +4,10 @@ import { sendGameWinnerEmail, sendPlayerGameSummaryEmail } from '@/lib/email';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { gameId: string } }
+  { params }: { params: Promise<{ gameId: string }> }
 ) {
   try {
-    const { playerIndex } = await request.json();
-    const gameId = params.gameId;
+    const [{ playerIndex }, { gameId }] = await Promise.all([request.json(), params]);
 
     const game = await getGameSessionById(gameId);
     if (!game) {

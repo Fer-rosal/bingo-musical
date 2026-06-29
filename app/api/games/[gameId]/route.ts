@@ -3,10 +3,10 @@ import { getGameSessionById } from '@/lib/db/gameSession';
 
 export async function GET(
   _: unknown,
-  { params }: { params: { gameId: string } }
+  { params }: { params: Promise<{ gameId: string }> }
 ) {
   try {
-    const gameId = params.gameId;
+    const { gameId } = await params;
     const game = await getGameSessionById(gameId);
 
     if (!game) {

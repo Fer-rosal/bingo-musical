@@ -3,11 +3,10 @@ import { getGameSessionById, addDrawnSong, updateGameStatus } from '@/lib/db/gam
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { gameId: string } }
+  { params }: { params: Promise<{ gameId: string }> }
 ) {
   try {
-    const { songId } = await request.json();
-    const gameId = params.gameId;
+    const [{ songId }, { gameId }] = await Promise.all([request.json(), params]);
 
     if (!songId) {
       return NextResponse.json(

@@ -4,11 +4,10 @@ import { sendPlayerJoinedEmail } from '@/lib/email';
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { gameId: string } }
+  { params }: { params: Promise<{ gameId: string }> }
 ) {
   try {
-    const { playerName, spotifyId, email } = await request.json();
-    const gameId = params.gameId;
+    const [{ playerName, spotifyId, email }, { gameId }] = await Promise.all([request.json(), params]);
 
     if (!playerName) {
       return NextResponse.json(
