@@ -6,29 +6,65 @@ import type { GameHistoryEntry } from '../../types/bingo'
 
 const HISTORY_KEY = 'bingo_history'
 
+interface OnlineGameSummary {
+  id: string
+  gameCode: string
+  playlistName: string
+  playerCount: number
+  gridSize: 4 | 5
+  status: 'waiting' | 'playing' | 'finished'
+  createdAt: number
+}
+
+type HistoryItem =
+  | (GameHistoryEntry & { kind: 'offline' })
+  | (OnlineGameSummary & { kind: 'online' })
+
 export default function Dashboard() {
   const router = useRouter()
-  const [history, setHistory] = useState<GameHistoryEntry[]>([])
+  const [items, setItems] = useState<HistoryItem[]>([])
   const [mounted, setMounted] = useState(false)
   const [error, setError] = useState('')
 
   useEffect(() => {
     const raw = localStorage.getItem(HISTORY_KEY)
-    if (raw) setHistory(JSON.parse(raw))
+    const offline: HistoryItem[] = raw
+      ? (JSON.parse(raw) as GameHistoryEntry[]).map(entry => ({ ...entry, kind: 'offline' as const }))
+      : []
+    setItems(offline)
     setMounted(true)
+
+    fetch('/api/games/mine')
+      .then(res => (res.ok ? res.json() : null))
+      .then(data => {
+        if (!data?.games) return
+        const online: HistoryItem[] = (data.games as OnlineGameSummary[]).map(game => ({ ...game, kind: 'online' as const }))
+        setItems(prev => [...prev.filter(i => i.kind !== 'online'), ...online])
+      })
+      .catch(() => {})
   }, [])
 
-  const handleResumeGame = (gameId: string) => {
-    const gameData = localStorage.getItem(`game_${gameId}`)
+  const handleResumeGame = (item: HistoryItem) => {
+    if (item.kind === 'online') {
+      router.push(`/online/${item.id}/host`)
+      return
+    }
+    const gameData = localStorage.getItem(`game_${item.id}`)
     if (!gameData) {
       setError('No se encontró la partida. Puede haber sido eliminada.')
       setTimeout(() => setError(''), 3000)
       return
     }
-    router.push(`/dashboard/game/${gameId}`)
+    router.push(`/dashboard/game/${item.id}`)
   }
 
   if (!mounted) return null
+
+  const sorted = [...items].sort((a, b) => {
+    const dateA = a.kind === 'offline' ? new Date(a.date).getTime() : a.createdAt
+    const dateB = b.kind === 'offline' ? new Date(b.date).getTime() : b.createdAt
+    return dateB - dateA
+  })
 
   return (
     <main className="min-h-screen bg-[#0a0a0a] px-6 py-10">
@@ -61,38 +97,43 @@ export default function Dashboard() {
             </div>
           )}
 
-          {history.length === 0 ? (
+          {sorted.length === 0 ? (
             <div className="text-center py-16 text-[#a3a3a3]">
               <p className="text-4xl mb-3">🎵</p>
               <p>Aún no hay partidas guardadas.</p>
             </div>
           ) : (
             <ul className="space-y-2">
-              {[...history].reverse().map(entry => (
-                <li key={entry.id}>
-                  <button
-                    onClick={() => handleResumeGame(entry.id)}
-                    className="group w-full bg-[#141414] hover:bg-[#1e1e1e] border border-[#2a2a2a] hover:border-[#1DB954]/40 rounded-2xl p-4 flex items-center justify-between transition-all duration-150 text-left"
-                  >
-                    <div>
-                      <p className="font-semibold text-white group-hover:text-[#1DB954]">{entry.playlistName}</p>
-                      <p className="text-sm text-[#a3a3a3] mt-0.5">
-                        {entry.playerCount} jugadores · {entry.gridSize}×{entry.gridSize} ·{' '}
-                        {new Date(entry.date).toLocaleDateString('es')}
-                      </p>
-                    </div>
-                    <span
-                      className={`text-xs font-semibold px-3 py-1 rounded-full ${
-                        entry.status === 'finished'
-                          ? 'bg-[#1DB954]/15 text-[#1DB954]'
-                          : 'bg-white/5 text-[#a3a3a3]'
-                      }`}
+              {sorted.map(item => {
+                const date = item.kind === 'offline' ? item.date : new Date(item.createdAt).toISOString()
+                const isFinished = item.status === 'finished'
+                return (
+                  <li key={`${item.kind}-${item.id}`}>
+                    <button
+                      onClick={() => handleResumeGame(item)}
+                      className="group w-full bg-[#141414] hover:bg-[#1e1e1e] border border-[#2a2a2a] hover:border-[#1DB954]/40 rounded-2xl p-4 flex items-center justify-between transition-all duration-150 text-left"
                     >
-                      {entry.status === 'finished' ? 'Finalizada' : 'Abandonada'}
-                    </span>
-                  </button>
-                </li>
-              ))}
+                      <div>
+                        <p className="font-semibold text-white group-hover:text-[#1DB954]">
+                          {item.playlistName}
+                          {item.kind === 'online' && <span className="ml-2 text-[10px] font-semibold text-[#1DB954]/80 align-middle">ONLINE</span>}
+                        </p>
+                        <p className="text-sm text-[#a3a3a3] mt-0.5">
+                          {item.playerCount} jugadores · {item.gridSize}×{item.gridSize} ·{' '}
+                          {new Date(date).toLocaleDateString('es')}
+                        </p>
+                      </div>
+                      <span
+                        className={`text-xs font-semibold px-3 py-1 rounded-full ${
+                          isFinished ? 'bg-[#1DB954]/15 text-[#1DB954]' : 'bg-white/5 text-[#a3a3a3]'
+                        }`}
+                      >
+                        {isFinished ? 'Finalizada' : item.kind === 'online' ? 'En curso' : 'Abandonada'}
+                      </span>
+                    </button>
+                  </li>
+                )
+              })}
             </ul>
           )}
         </div>
