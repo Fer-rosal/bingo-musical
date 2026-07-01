@@ -77,6 +77,34 @@ export async function refreshAccessToken(
   }
 }
 
+let appToken: { token: string; expiresAt: number } | null = null
+
+// ponytail: module-level cache, single-process only. Fine for one Next.js server;
+// upgrade to shared cache (Redis) if scaled to multiple instances.
+export async function getAppAccessToken(): Promise<string> {
+  if (appToken && appToken.expiresAt > Date.now()) return appToken.token
+
+  const clientId = process.env.NEXT_PUBLIC_SPOTIFY_CLIENT_ID
+  const clientSecret = process.env.SPOTIFY_CLIENT_SECRET
+  if (!clientId || !clientSecret) throw new SpotifyError(500, 'Missing Spotify app credentials')
+
+  const res = await fetch('https://accounts.spotify.com/api/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({
+      grant_type: 'client_credentials',
+      client_id: clientId,
+      client_secret: clientSecret,
+    }).toString(),
+  })
+
+  if (!res.ok) throw new SpotifyError(res.status, 'Failed to get app access token')
+
+  const data = await res.json()
+  appToken = { token: data.access_token, expiresAt: Date.now() + (data.expires_in - 60) * 1000 }
+  return appToken.token
+}
+
 export async function getPlaylistInfo(
   token: string,
   playlistId: string

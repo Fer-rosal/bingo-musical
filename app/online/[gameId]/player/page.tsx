@@ -47,7 +47,7 @@ export default function PlayerGamePage() {
 
     const fetchTracks = async () => {
       try {
-        const res = await fetch(`/api/playlists/${data.playlistId}/tracks`);
+        const res = await fetch(`/api/games/${gameId}/tracks`);
         if (!res.ok) throw new Error();
         const { tracks: fetchedTracks } = await res.json();
         setTracks(fetchedTracks);
