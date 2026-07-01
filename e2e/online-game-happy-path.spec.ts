@@ -76,6 +76,10 @@ async function mockHostApis(page: Page, state: GameServerState) {
     state.status = 'playing'
     await route.fulfill({ json: { success: true } })
   })
+  await page.route(`/api/games/${GAME_ID}/confirm-bingo`, async route => {
+    state.status = 'finished'
+    await route.fulfill({ json: { success: true } })
+  })
   await mockCommonApis(page, state)
 }
 
@@ -160,6 +164,15 @@ test.describe('Online Game Happy Path', () => {
 
     // ── PLAYER: sees the revealed song show up after its next poll ──────────
     await expect(playerPage.getByText('1 canciones')).toBeVisible({ timeout: 5000 })
+
+    // ── HOST: BINGO requires a second confirmation before the game ends ─────
+    await hostPage.getByRole('button', { name: 'BINGO' }).click()
+    await expect(hostPage.getByRole('button', { name: /Confirmar BINGO y finalizar/i })).toBeVisible()
+    // Game must still be running — no "finished" banner yet
+    await expect(hostPage.getByText('¡Bingo confirmado!')).not.toBeVisible()
+
+    await hostPage.getByRole('button', { name: /Confirmar BINGO y finalizar/i }).click()
+    await expect(hostPage.getByText('¡Bingo confirmado! El juego ha terminado.')).toBeVisible()
 
     await hostCtx.close()
     await playerCtx.close()

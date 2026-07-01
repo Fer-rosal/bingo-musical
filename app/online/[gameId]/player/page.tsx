@@ -28,6 +28,7 @@ export default function PlayerGamePage() {
   const [overlayTrack, setOverlayTrack] = useState<SpotifyTrack | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  const [showRecent, setShowRecent] = useState(false);
 
   const holdTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const holdFired = useRef(false);
@@ -201,23 +202,31 @@ export default function PlayerGamePage() {
           ))}
         </div>
 
-        {/* Recently drawn songs — compact list below cartón */}
+        {/* Recent songs — button reveals only the last 3 played */}
         {drawnSongs.length > 0 && (
           <div className="mt-4">
-            <p className="text-[#a3a3a3] text-xs mb-2">Últimas canciones</p>
-            <div className="space-y-1 max-h-32 overflow-y-auto">
-              {[...drawnSongs].reverse().map((songId) => {
-                const track = tracks.find(t => t.id === songId);
-                return (
-                  <div key={songId} className="flex items-center gap-2 py-1 border-b border-[#282828]">
-                    <div>
-                      <p className="text-white text-xs font-semibold line-clamp-1">{track?.name ?? songId}</p>
-                      <p className="text-[#a3a3a3] text-[0.6rem] line-clamp-1">{track?.artists?.[0]?.name}</p>
+            <button
+              onClick={() => setShowRecent(v => !v)}
+              className="w-full text-center text-xs text-[#a3a3a3] hover:text-white py-2 border border-[#2a2a2a] rounded-lg transition-colors"
+            >
+              {showRecent ? 'Ocultar canciones recientes' : 'Ver canciones recientes'}
+            </button>
+
+            {showRecent && (
+              <div className="space-y-1 mt-2">
+                {[...drawnSongs].reverse().slice(0, 3).map((songId) => {
+                  const track = tracks.find(t => t.id === songId);
+                  return (
+                    <div key={songId} className="flex items-center gap-2 py-1 border-b border-[#282828]">
+                      <div>
+                        <p className="text-white text-xs font-semibold line-clamp-1">{track?.name ?? songId}</p>
+                        <p className="text-[#a3a3a3] text-[0.6rem] line-clamp-1">{track?.artists?.[0]?.name}</p>
+                      </div>
                     </div>
-                  </div>
-                );
-              })}
-            </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -235,8 +235,31 @@ export default function GamePage() {
     localStorage.setItem(`game_${gameId}`, JSON.stringify(updated))
   }
 
-  const confirmBingo = () => {
+  const pausePlayback = async () => {
+    try {
+      if (isAndroid) {
+        await getAndroidSpotifyService().pausePlayback()
+      } else if (isMobileBrowser) {
+        const tokenRes = await fetch('/api/auth/token')
+        if (tokenRes.ok) {
+          const { token } = await tokenRes.json()
+          await fetch('https://api.spotify.com/v1/me/player/pause', {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${token}` },
+          })
+        }
+      } else if (player) {
+        await player.pause()
+      }
+      setIsPlaying(false)
+    } catch (e) {
+      console.error('Failed to pause playback:', e)
+    }
+  }
+
+  const confirmBingo = async () => {
     if (!game) return
+    await pausePlayback()
     const raw = localStorage.getItem(HISTORY_KEY)
     const history: GameHistoryEntry[] = raw ? JSON.parse(raw) : []
     const idx = history.findIndex(h => h.id === gameId)

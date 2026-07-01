@@ -36,6 +36,7 @@ export default function HostGamePage() {
   const [tracks, setTracks] = useState<SpotifyTrack[]>([]);
   const [shuffledQueue, setShuffledQueue] = useState<string[]>([]);
   const [lineaGiven, setLineaGiven] = useState(false);
+  const [bingoConfirming, setBingoConfirming] = useState(false);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [songSearch, setSongSearch] = useState('');
@@ -267,6 +268,28 @@ export default function HostGamePage() {
     player.togglePlay();
   };
 
+  const pausePlayback = async () => {
+    try {
+      if (isAndroid) {
+        await getAndroidSpotifyService().pausePlayback();
+      } else if (isMobileBrowser) {
+        const tokenRes = await fetch('/api/auth/token');
+        if (tokenRes.ok) {
+          const { token } = await tokenRes.json();
+          await fetch('https://api.spotify.com/v1/me/player/pause', {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        }
+      } else if (player) {
+        await player.pause();
+      }
+      setIsPlaying(false);
+    } catch (e) {
+      console.error('Failed to pause playback:', e);
+    }
+  };
+
   const drawnCount = drawnSongIds.length;
   const nextTrackId = shuffledQueue[drawnCount];
   const currentTrack = tracks.find(t => t.id === drawnSongIds.at(-1)) ?? null;
@@ -291,8 +314,12 @@ export default function HostGamePage() {
     setLineaGiven(true);
   };
 
-  const handleBingo = async () => {
-    if (isPlaying) { try { await togglePlayPause(); } catch { /* ignore */ } }
+  const handleBingo = () => {
+    setBingoConfirming(true);
+  };
+
+  const confirmBingo = async () => {
+    await pausePlayback();
     try {
       await fetch(`/api/games/${gameId}/confirm-bingo`, {
         method: 'POST',
@@ -415,33 +442,42 @@ export default function HostGamePage() {
             {/* Reveal button */}
             <button
               onClick={revealNext}
-              disabled={!hasMoreSongs}
+              disabled={!hasMoreSongs || bingoConfirming}
               data-testid="host-reveal-song-btn"
               className="w-full py-4 bg-white hover:bg-[#f0f0f0] disabled:bg-[#1e1e1e] disabled:text-[#a3a3a3] text-black font-bold text-base rounded-2xl transition-all duration-150 hover:scale-[1.01] active:scale-[0.99] disabled:scale-100 disabled:cursor-not-allowed mb-3"
             >
               {hasMoreSongs ? (drawnCount === 0 ? '▶ Iniciar partida' : '⏭ Siguiente canción') : 'No hay más canciones'}
             </button>
 
-            {/* Línea / Bingo buttons */}
-            <div className="flex gap-2 mb-6">
+            {bingoConfirming ? (
               <button
-                onClick={handleLinea}
-                disabled={lineaGiven}
-                className={`flex-1 py-3 rounded-2xl font-bold text-sm transition-all duration-150 ${
-                  lineaGiven
-                    ? 'bg-[#1e1e1e] text-[#606060] cursor-not-allowed border border-[#2a2a2a]'
-                    : 'bg-[#141414] hover:bg-[#1e1e1e] border border-[#2a2a2a] hover:border-yellow-500/50 text-yellow-400'
-                }`}
+                onClick={confirmBingo}
+                className="w-full py-3 bg-[#1DB954] hover:bg-[#1aa34a] text-black font-bold text-sm rounded-2xl transition-all duration-150 mb-6"
               >
-                {lineaGiven ? 'Línea ✓' : 'LÍNEA'}
+                🎉 Confirmar BINGO y finalizar
               </button>
-              <button
-                onClick={handleBingo}
-                className="flex-1 py-3 bg-[#141414] hover:bg-[#1e1e1e] border border-[#2a2a2a] hover:border-red-500/50 text-red-400 font-bold text-sm rounded-2xl transition-all duration-150"
-              >
-                BINGO
-              </button>
-            </div>
+            ) : (
+              /* Línea / Bingo buttons */
+              <div className="flex gap-2 mb-6">
+                <button
+                  onClick={handleLinea}
+                  disabled={lineaGiven}
+                  className={`flex-1 py-3 rounded-2xl font-bold text-sm transition-all duration-150 ${
+                    lineaGiven
+                      ? 'bg-[#1e1e1e] text-[#606060] cursor-not-allowed border border-[#2a2a2a]'
+                      : 'bg-[#141414] hover:bg-[#1e1e1e] border border-[#2a2a2a] hover:border-yellow-500/50 text-yellow-400'
+                  }`}
+                >
+                  {lineaGiven ? 'Línea ✓' : 'LÍNEA'}
+                </button>
+                <button
+                  onClick={handleBingo}
+                  className="flex-1 py-3 bg-[#141414] hover:bg-[#1e1e1e] border border-[#2a2a2a] hover:border-red-500/50 text-red-400 font-bold text-sm rounded-2xl transition-all duration-150"
+                >
+                  BINGO
+                </button>
+              </div>
+            )}
           </>
         )}
 
