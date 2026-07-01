@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import type { GameState, GameHistoryEntry } from '../../../../types/bingo'
 import { ReconnectModal } from '../../../../components/ReconnectModal'
+import { detectPlatform } from '@/lib/spotify/capacitor-bridge'
+import { getAndroidSpotifyService } from '@/lib/spotify/android-spotify-service'
 
 const HISTORY_KEY = 'bingo_history'
 
@@ -25,10 +27,15 @@ export default function GamePage() {
   const [isPlaying, setIsPlaying] = useState(false)
   const [player, setPlayer] = useState<any>(null)
   const [playerReady, setPlayerReady] = useState(false)
+  const [nativeReady, setNativeReady] = useState(false)
   const [deviceError, setDeviceError] = useState('')
   const [songSearch, setSongSearch] = useState('')
   const [showReconnectModal, setShowReconnectModal] = useState(false)
+  const [showSpotifyHint, setShowSpotifyHint] = useState(false)
   const deviceIdRef = useRef<string | null>(null)
+  // ponytail: computed once on mount; detectPlatform() returns 'web' during SSR so effects are safe
+  const isAndroid = detectPlatform() === 'android'
+  const isMobileBrowser = !isAndroid && typeof navigator !== 'undefined' && /Android|iPhone|iPad/i.test(navigator.userAgent)
 
   useEffect(() => {
     const raw = localStorage.getItem(`game_${gameId}`)
@@ -43,6 +50,25 @@ export default function GamePage() {
     let isMounted = true
 
     const initPlayer = async () => {
+      if (isAndroid) {
+        // Web Playback SDK requires browser DRM (EME/Widevine) — not available in WebViews.
+        // Use the Capacitor native App Remote bridge instead.
+        const service = getAndroidSpotifyService()
+        if (service.canUse() && !service.getIsConnected()) {
+          await service.connectToNativeSpotify()
+        }
+        if (isMounted && service.getIsConnected()) setNativeReady(true)
+        else if (isMounted) setDeviceError('No se pudo conectar con la app de Spotify')
+        return
+      }
+
+      if (isMobileBrowser) {
+        // Web Playback SDK is desktop-only. On mobile browsers we relay commands to
+        // whatever device is active in the user's Spotify app via the REST API.
+        if (isMounted) setNativeReady(true)
+        return
+      }
+
       try {
         const res = await fetch('/api/auth/token')
         if (!res.ok) return
@@ -94,16 +120,52 @@ export default function GamePage() {
     initPlayer()
     return () => {
       isMounted = false
+      // ponytail: player captured via closure; disconnect called on unmount
       if (player) player.disconnect()
     }
   }, [])
 
   useEffect(() => {
-    if (!game || !playerReady || !deviceIdRef.current) return
+    if (!game) return
+    const currentTrack = game.tracks.find(t => t.id === game.drawnIds.at(-1))
+    if (!currentTrack) return
 
     const playTrack = async () => {
-      const currentTrack = game.tracks.find(t => t.id === game.drawnIds.at(-1))
-      if (!currentTrack) return
+      if (isAndroid) {
+        if (!nativeReady) return
+        try {
+          await getAndroidSpotifyService().playTrack(currentTrack.id)
+          setIsPlaying(true)
+        } catch (e) {
+          console.error('Native play failed:', e)
+          setDeviceError('Error al reproducir la canción')
+        }
+        return
+      }
+
+      if (isMobileBrowser) {
+        if (!nativeReady) return
+        try {
+          const tokenRes = await fetch('/api/auth/token')
+          if (tokenRes.status === 401) { setShowReconnectModal(true); return }
+          if (!tokenRes.ok) return
+          const { token } = await tokenRes.json()
+          const res = await fetch('https://api.spotify.com/v1/me/player/play', {
+            method: 'PUT',
+            headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ uris: [`spotify:track:${currentTrack.id}`] }),
+          })
+          if (res.status === 401) { setShowReconnectModal(true); return }
+          // 404 = no active device (Spotify app not open on phone)
+          if (res.status === 404) { setShowSpotifyHint(true); return }
+          if (res.ok || res.status === 204) { setIsPlaying(true); setShowSpotifyHint(false) }
+        } catch (e) {
+          console.error('Mobile play failed:', e)
+        }
+        return
+      }
+
+      if (!playerReady || !deviceIdRef.current) return
 
       try {
         const tokenRes = await fetch('/api/auth/token')
@@ -138,7 +200,7 @@ export default function GamePage() {
     }
 
     playTrack()
-  }, [game?.drawnIds, playerReady])
+  }, [game?.drawnIds, playerReady, nativeReady])
 
   const revealNext = () => {
     if (!game || status !== 'playing') return
@@ -185,7 +247,37 @@ export default function GamePage() {
     router.push('/dashboard')
   }
 
-  const togglePlayPause = () => {
+  const togglePlayPause = async () => {
+    if (isAndroid) {
+      const service = getAndroidSpotifyService()
+      try {
+        if (isPlaying) {
+          await service.pausePlayback()
+          setIsPlaying(false)
+        } else {
+          await service.resumePlayback()
+          setIsPlaying(true)
+        }
+      } catch (e) {
+        console.error('Native toggle failed:', e)
+      }
+      return
+    }
+    if (isMobileBrowser) {
+      try {
+        const tokenRes = await fetch('/api/auth/token')
+        if (!tokenRes.ok) return
+        const { token } = await tokenRes.json()
+        const endpoint = isPlaying
+          ? 'https://api.spotify.com/v1/me/player/pause'
+          : 'https://api.spotify.com/v1/me/player/play'
+        await fetch(endpoint, { method: 'PUT', headers: { Authorization: `Bearer ${token}` } })
+        setIsPlaying(!isPlaying)
+      } catch (e) {
+        console.error('Mobile toggle failed:', e)
+      }
+      return
+    }
     if (!player) return
     player.togglePlay()
   }
@@ -245,7 +337,13 @@ export default function GamePage() {
                 <p className="text-xs text-red-400 mb-3">{deviceError}</p>
               )}
 
-              {playerReady ? (
+              {showSpotifyHint && (
+                <p className="text-xs text-yellow-400 mb-3">
+                  Abre Spotify en tu móvil y pulsa play una vez para activarlo
+                </p>
+              )}
+
+              {(playerReady || nativeReady) ? (
                 <button
                   onClick={togglePlayPause}
                   className="flex items-center gap-2 bg-[#1DB954] hover:bg-[#1aa34a] text-black font-bold text-sm px-5 py-2.5 rounded-full transition-all duration-150 hover:scale-105 active:scale-95 pulse-green"

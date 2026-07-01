@@ -180,6 +180,10 @@ export class AndroidSpotifyService {
     }
   }
 
+  getIsConnected(): boolean {
+    return this.bridge.getIsConnected();
+  }
+
   /**
    * Get current playback state
    */
