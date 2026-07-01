@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createGameSession } from '@/lib/db/gameSession';
 import { sendGameCreatedEmail } from '@/lib/email';
+import { getPlaylistTracks } from '@/lib/spotify';
 
 export async function POST(request: NextRequest) {
   try {
@@ -29,6 +30,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const tracks = await getPlaylistTracks(accessToken, playlistId);
+
     const game = await createGameSession(
       hostSpotifyId,
       hostEmail,
@@ -36,6 +39,7 @@ export async function POST(request: NextRequest) {
       playlistName,
       playlistImageUrl,
       { gridSize: gridSize || 5, preMarkedCount: preMarkedCount || 0 },
+      tracks,
       hostDeviceId
     );
 

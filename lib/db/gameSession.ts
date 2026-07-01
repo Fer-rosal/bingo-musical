@@ -33,6 +33,7 @@ function rowToSession(
     endedAt: row.ended_at ? new Date(row.ended_at).getTime() : undefined,
     hostDeviceId: row.host_device_id ?? undefined,
     winnerPlayerIndex: row.winner_player_index ?? undefined,
+    tracks: (row.tracks as GameSession['tracks']) ?? [],
   };
 }
 
@@ -71,6 +72,7 @@ export async function createGameSession(
   playlistName: string,
   playlistImageUrl: string | undefined,
   config: OnlineGameConfig,
+  tracks: GameSession['tracks'],
   hostDeviceId?: string,
 ): Promise<GameSession> {
   if (!hostSpotifyId) throw new Error('hostSpotifyId is required');
@@ -91,6 +93,7 @@ export async function createGameSession(
       grid_size: config.gridSize,
       pre_marked_count: config.preMarkedCount,
       host_device_id: hostDeviceId ?? null,
+      tracks,
     })
     .select()
     .single();

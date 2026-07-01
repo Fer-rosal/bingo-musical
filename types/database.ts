@@ -18,6 +18,7 @@ export interface Database {
           created_at: string;
           started_at: string | null;
           ended_at: string | null;
+          tracks: unknown;
         };
         Insert: {
           id?: string;
@@ -35,6 +36,7 @@ export interface Database {
           created_at?: string;
           started_at?: string | null;
           ended_at?: string | null;
+          tracks?: unknown;
         };
         Update: {
           status?: 'waiting' | 'playing' | 'finished';

@@ -1,3 +1,5 @@
+import type { SpotifyTrack } from './bingo';
+
 export type GameStatus = 'waiting' | 'playing' | 'finished';
 
 export interface GameSession {
@@ -13,6 +15,7 @@ export interface GameSession {
   playerCount: number;
   preMarkedCount: number;
   drawnSongIds: string[]; // Spotify track IDs
+  tracks: SpotifyTrack[]; // snapshotted from the playlist at creation time
   players: GamePlayer[];
   createdAt: number; // timestamp
   startedAt?: number;
